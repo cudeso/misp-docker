@@ -265,8 +265,11 @@ EOF
 EOF
 
     # Customisations
+    RUN apt-get install -y --no-install-recommends \
+        logrotate
     COPY files/etc/logger/40-misp.conf /etc/rsyslog.d/
     COPY files/etc/logger/misp.logrotate /etc/logrotate.d/misp
+    RUN chmod og-w /etc/logrotate.d/misp
 
     RUN mkdir /var/www/MISP/misp-custom
     RUN mkdir /var/www/MISP/misp-custom/scripts
