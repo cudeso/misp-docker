@@ -1,0 +1,28 @@
+/var/log/misp/mispsyslog.log /var/log/misp/mispcuration.log /var/log/misp/mispcleaner.log /var/log/misp/misp2sentinel.log
+/var/www/MISP/app/tmp/logs/misp-workers.log /var/www/MISP/app/tmp/logs/misp-workers-errors.log
+{
+    su root www-data
+    rotate 8
+    dateext
+    missingok
+    notifempty
+    compress
+    weekly
+    size 50M
+    maxsize 500M
+    copytruncate
+}
+
+/var/log/misp/mispsync.log
+/var/www/MISP/app/tmp/logs/debug.log /var/www/MISP/app/tmp/logs/error.log /var/www/MISP/app/tmp/logs/mispzmq.error.log /var/www/MISP/app/tmp/logs/mispzmq.log /var/www/MISP/app/tmp/logs/server-sync.log  {
+    su www-data www-data
+    rotate 5
+    dateext
+    missingok
+    notifempty
+    compress
+    weekly
+    size 50M
+    maxsize 500M
+    copytruncate
+}
