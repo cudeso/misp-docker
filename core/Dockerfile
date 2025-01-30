@@ -180,6 +180,7 @@ FROM php-base
         rsync \
         # Include rsyslog to support syslogger
         rsyslog \
+        logrotate \
         # PHP Requirements
         php8.2 \
         php8.2-apcu \
@@ -264,9 +265,7 @@ EOF
         touch /var/www/MISP/.git/ORIG_HEAD && chmod 0600 /var/www/MISP/.git/ORIG_HEAD && chown www-data:www-data /var/www/MISP/.git/ORIG_HEAD
 EOF
 
-    # Customisations
-    RUN apt-get install -y --no-install-recommends \
-        logrotate
+    # Customisations        
     COPY files/etc/logger/40-misp.conf /etc/rsyslog.d/
     COPY files/etc/logger/misp.logrotate /etc/logrotate.d/misp
     RUN chmod og-w /etc/logrotate.d/misp
@@ -279,7 +278,7 @@ EOF
                             certifi charset-normalizer colorama Deprecated distlib filelock idna importlib-resources \
                             jmespath jsonschema misp-stix pipenv platformdirs pyasn1 pycparser pymisp pyrsistent python-dateutil \
                             PyYAML requests requests-futures rsa six urllib3 virtualenv virtualenv-clone wrapt \
-                            zmq
+                            zmq redis
 
     # Copy all our image specific files to appropriate locations
     COPY files/ /

@@ -104,7 +104,7 @@ services:
       - ${DATA_DIR:-./data}/cron.d:/etc/cron.d:z
       - ${DATA_DIR:-./data}/ssl_private:/etc/nginx/certs/:z
       # customize by replacing ${CUSTOM_PATH} with a path containing 'files/customize_misp.sh'
-      - ./custom/:/custom/"
+      - ./custom/:/custom/
       # mount custom ca root certificates
       # - "./rootca.pem:/usr/local/share/ca-certificates/rootca.crt"
     environment:
