@@ -270,6 +270,7 @@ EOF
     COPY files/etc/logger/misp.logrotate /etc/logrotate.d/misp
     RUN chmod og-w /etc/logrotate.d/misp
 
+    RUN mkdir /var/www/MISP/app/webroot/misp-export
     RUN mkdir /var/www/MISP/misp-custom
     RUN mkdir /var/www/MISP/misp-custom/scripts
     RUN /usr/local/bin/python -m venv /var/www/MISP/misp-custom/venv
@@ -278,7 +279,7 @@ EOF
                             certifi charset-normalizer colorama Deprecated distlib filelock idna importlib-resources \
                             jmespath jsonschema misp-stix pipenv platformdirs pyasn1 pycparser pymisp pyrsistent python-dateutil \
                             PyYAML requests requests-futures rsa six urllib3 virtualenv virtualenv-clone wrapt \
-                            zmq redis pyaml
+                            zmq redis pyaml tldextract
 
     # Copy all our image specific files to appropriate locations
     COPY files/ /
