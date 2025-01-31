@@ -279,7 +279,7 @@ EOF
                             certifi charset-normalizer colorama Deprecated distlib filelock idna importlib-resources \
                             jmespath jsonschema misp-stix pipenv platformdirs pyasn1 pycparser pymisp pyrsistent python-dateutil \
                             PyYAML requests requests-futures rsa six urllib3 virtualenv virtualenv-clone wrapt \
-                            zmq redis pyaml tldextract
+                            zmq redis pyaml tldextract markdown2
 
     # Copy all our image specific files to appropriate locations
     COPY files/ /
