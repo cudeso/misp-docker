@@ -234,6 +234,7 @@ FROM php-base
                 mariadb-client \
                 rsync \
                 rsyslog \
+                logrotate \
                 php8.2 \
                 php8.2-curl \
                 php8.2-xml \
@@ -260,6 +261,7 @@ FROM php-base
                 mariadb-client \
                 rsync \
                 rsyslog \
+                logrotate \
                 php8.2 \
                 php8.2-apcu \
                 php8.2-curl \
@@ -349,6 +351,22 @@ EOF
         touch /var/www/MISP/.git/ORIG_HEAD && chmod 0600 /var/www/MISP/.git/ORIG_HEAD && chown www-data:www-data /var/www/MISP/.git/ORIG_HEAD
 EOF
 
+    # Customisations        
+    COPY files/etc/logger/40-misp.conf /etc/rsyslog.d/
+    COPY files/etc/logger/misp.logrotate /etc/logrotate.d/misp
+    RUN chmod og-w /etc/logrotate.d/misp
+
+    RUN mkdir /var/www/MISP/app/webroot/misp-export
+    RUN mkdir /var/www/MISP/misp-custom
+    RUN mkdir /var/www/MISP/misp-custom/scripts
+    RUN /usr/local/bin/python -m venv /var/www/MISP/misp-custom/venv
+    WORKDIR /var/www/MISP/misp-custom/scripts
+    RUN /var/www/MISP/misp-custom/venv/bin/pip install asn1crypto attrs azure-keyvault-secrets azure-identity \
+                            certifi charset-normalizer colorama Deprecated distlib filelock idna importlib-resources \
+                            jmespath jsonschema misp-stix pipenv platformdirs pyasn1 pycparser pymisp pyrsistent python-dateutil \
+                            PyYAML requests requests-futures rsa six urllib3 virtualenv virtualenv-clone wrapt \
+                            zmq redis pyaml tldextract markdown2
+                            
     # Copy all our image specific files to appropriate locations
     COPY files/ /
     ENTRYPOINT [ "/entrypoint.sh" ]
