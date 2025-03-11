@@ -273,10 +273,10 @@ services:
       start_interval: 5s
     volumes:
       # custom MISP modules are loaded at startup time
-      - "./custom/action_mod/:/custom/action_mod/"
-      - "./custom/expansion/:/custom/expansion/"
-      - "./custom/export_mod/:/custom/export_mod/"
-      - "./custom/import_mod/:/custom/import_mod/"
-
+      - ${DATA_DIR:-./data}/custom/action_mod/:/custom/action_mod/
+      - ${DATA_DIR:-./data}/custom/expansion/:/custom/expansion/
+      - ${DATA_DIR:-./data}/custom/export_mod/:/custom/export_mod/
+      - ${DATA_DIR:-./data}/custom/import_mod/:/custom/import_mod/
+      
 volumes:
     mysql_data:
