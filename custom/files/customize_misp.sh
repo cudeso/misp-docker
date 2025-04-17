@@ -7,6 +7,8 @@ chown -R www-data:www-data "$MISP_CUSTOM_DIR"
 # Set correct permissions for cron
 chown root:root /etc/cron.d/misp
 
+# Ensure we do not get "Cannot make/remove an entry for the specified session"
+sed -i '/session    required     pam_loginuid.so/c\#session    required   pam_loginuid.so' /etc/pam.d/cron
 
 sudo -H -E -u www-data /var/www/MISP/app/Console/cake Admin setSetting "MISP.attachments_dir" "/var/www/MISP/app/files"
 sudo -H -E -u www-data /var/www/MISP/app/Console/cake Admin setSetting "Plugin.Action_services_url" "http://misp-modules"
