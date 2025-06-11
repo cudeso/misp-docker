@@ -148,6 +148,8 @@ FROM php-base AS python-build
     ARG PYPI_CYBOX_VERSION
     ARG PYPI_PYMISP_VERSION
     ARG PYPI_MISP_STIX_VERSION
+    ARG PYPI_SETUPTOOLS
+    ARG PYPI_SUPERVISOR
 
     RUN apt-get install -y --no-install-recommends \
         git \
@@ -175,7 +177,7 @@ EOF
         # 2. If missing, add it (with optional version from env (defaults to empty string))
         # 3. If present, replace with our specified version if it exists, otherwise leave
         #    the upstream version alone.
-        set -- "redis" "lief" "pydeep2" "python-magic" "misp-lib-stix2" "maec" "mixbox" "cybox" "pymisp" "misp-stix"
+        set -- "redis" "lief" "pydeep2" "python-magic" "misp-lib-stix2" "maec" "mixbox" "cybox" "pymisp" "misp-stix" "setuptools" "supervisor"
         for mod in "$@"; do
             mod_version_var=$(echo "PYPI_${mod}_VERSION" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
             mod_version=$(eval "echo \"\$$mod_version_var\"")
@@ -245,6 +247,7 @@ FROM php-base
                 php8.2-fpm \
                 php8.2-zip \
                 unzip \
+                zip \
                 curl \
                 jq
         else
@@ -253,7 +256,6 @@ FROM php-base
                 procps \
                 sudo \
                 nginx \
-                supervisor \
                 cron \
                 openssl \
                 gpg \
@@ -284,6 +286,7 @@ FROM php-base
                 ssdeep \
                 libfuzzy2 \
                 unzip \
+                zip \
                 curl \
                 jq
         fi
@@ -305,14 +308,6 @@ EOF
     COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/composer.lock /var/www/MISP/app/composer.lock
     COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/Vendor /var/www/MISP/app/Vendor
     COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/Plugin /var/www/MISP/app/Plugin
-
-    # 'setuptools' is needed at runtime by 'mixbox'
-    RUN pip install setuptools
-    RUN cp /usr/local/lib/python3.12/site-packages/setuptools/_distutils/version.py \
-        /usr/local/lib/python3.12/site-packages/mixbox/distutils_version.py
-    RUN sed -i 's/from distutils\.version/from mixbox.distutils_version/' \
-        /usr/local/lib/python3.12/site-packages/mixbox/parser.py
-    RUN pip uninstall -y setuptools pip
 
     # Gather these in one layer, only act on actual directories under /etc/php/
     RUN <<-EOF

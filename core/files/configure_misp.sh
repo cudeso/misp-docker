@@ -97,7 +97,8 @@ set_up_oidc() {
                 \"client_secret\": \"${OIDC_CLIENT_SECRET}\",
                 \"roles_property\": \"${OIDC_ROLES_PROPERTY}\",
                 \"role_mapper\": ${OIDC_ROLES_MAPPING},
-                \"default_org\": \"${OIDC_DEFAULT_ORG}\"
+                \"default_org\": \"${OIDC_DEFAULT_ORG}\",
+                \"mixedAuth\": ${OIDC_MIXEDAUTH}
             }
         }" > /dev/null
 
@@ -114,7 +115,12 @@ set_up_oidc() {
 
         # Set the custom logout URL for OIDC if it is defined
         if [[ -n "${OIDC_LOGOUT_URL}" ]]; then
-            sudo -u www-data /var/www/MISP/app/Console/cake Admin setSetting -q "Plugin.CustomAuth_custom_logout" "${OIDC_LOGOUT_URL}&post_logout_redirect_uri=${BASE_URL}/users/login"
+            if [[ "${OIDC_LOGOUT_URL}" == *"?"* ]]; then
+                OIDC_LOGOUT_URL_COMPLETE="${OIDC_LOGOUT_URL}&post_logout_redirect_uri=${BASE_URL}/users/login"
+            else
+                OIDC_LOGOUT_URL_COMPLETE="${OIDC_LOGOUT_URL}?post_logout_redirect_uri=${BASE_URL}/users/login"
+            fi
+            sudo -u www-data /var/www/MISP/app/Console/cake Admin setSetting -q "Plugin.CustomAuth_custom_logout" "${OIDC_LOGOUT_URL_COMPLETE}"
         else
             echo "OIDC_LOGOUT_URL is not set"
         fi
