@@ -16,7 +16,6 @@ export MYSQL_CMD="mysql -u $MYSQL_USER -p$MYSQL_PASSWORD -P $MYSQL_PORT -h $MYSQ
 export REDIS_HOST=${REDIS_HOST:-redis}
 export REDIS_PORT=${REDIS_PORT:-6379}
 export REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
-export CRON_USER_ID=${CRON_USER_ID:-1}
 export BASE_URL=${BASE_URL:-https://localhost}
 export DISABLE_IPV6=${DISABLE_IPV6:-false}
 export DISABLE_SSL_REDIRECT=${DISABLE_SSL_REDIRECT:-false}

@@ -42,6 +42,14 @@ variable "PYPI_MISP_STIX" {
   default = ""
 }
 
+variable "PYPI_SETUPTOOLS" {
+  default = ""
+}
+
+variable "PYPI_SUPERVISOR" {
+  default = ""
+}
+
 variable "NAMESPACE" {
   default = null
 }
@@ -121,6 +129,8 @@ target "misp-core" {
     "PYPI_MIXBOX_VERSION": "${PYPI_MIXBOX_VERSION}",
     "PYPI_CYBOX_VERSION": "${PYPI_CYBOX_VERSION}",
     "PYPI_PYMISP_VERSION": "${PYPI_PYMISP_VERSION}",
+    "PYPI_SETUPTOOLS": "${PYPI_SETUPTOOLS}",
+    "PYPI_SUPERVISOR": "${PYPI_SUPERVISOR}",
   }
   platforms = "${PLATFORMS}"
 }
@@ -143,6 +153,8 @@ target "misp-core-slim" {
     "PYPI_MIXBOX_VERSION": "${PYPI_MIXBOX_VERSION}",
     "PYPI_CYBOX_VERSION": "${PYPI_CYBOX_VERSION}",
     "PYPI_PYMISP_VERSION": "${PYPI_PYMISP_VERSION}",
+    "PYPI_SETUPTOOLS": "${PYPI_SETUPTOOLS}",
+    "PYPI_SUPERVISOR": "${PYPI_SUPERVISOR}",
   }
   platforms = "${PLATFORMS}"
 }

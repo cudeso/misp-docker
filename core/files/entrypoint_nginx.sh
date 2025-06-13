@@ -73,27 +73,35 @@ init_misp_data_files(){
         sed "s|CakePlugin::load('OidcAuth');||g" $MISP_APP_CONFIG_PATH/bootstrap.php > tmp; cat tmp > $MISP_APP_CONFIG_PATH/bootstrap.php; rm tmp
         sed "s|CakePlugin::load('ShibbAuth');||g" $MISP_APP_CONFIG_PATH/bootstrap.php > tmp; cat tmp > $MISP_APP_CONFIG_PATH/bootstrap.php; rm tmp
         cat <<EOT >> $MISP_APP_CONFIG_PATH/bootstrap.php
+
 /**
  * Detect what auth modules need to be loaded based on the loaded config
  */
+
 if (Configure::read('AadAuth')) {
     CakePlugin::load('AadAuth');
 }
+
 if (Configure::read('CertAuth')) {
     CakePlugin::load('CertAuth');
 }
+
 if (Configure::read('LdapAuth')) {
     CakePlugin::load('LdapAuth');
 }
+
 if (Configure::read('LinOTPAuth')) {
     CakePlugin::load('LinOTPAuth');
 }
+
 if (Configure::read('OidcAuth')) {
     CakePlugin::load('OidcAuth');
 }
+
 if (Configure::read('ShibbAuth')) {
     CakePlugin::load('ShibbAuth');
 }
+
 EOT
     else
         echo "... patch bootstrap.php settings not required"

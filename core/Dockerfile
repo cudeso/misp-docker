@@ -228,7 +228,6 @@ FROM php-base
                 procps \
                 sudo \
                 nginx \
-                supervisor \
                 cron \
                 openssl \
                 gpg \
@@ -293,6 +292,8 @@ FROM php-base
         apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 EOF
 
+    # Remove some defaults (kernel logging) and fix alternatives
+    RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
     RUN update-alternatives --set php /usr/bin/php8.2
 
     # Install python modules
@@ -360,8 +361,10 @@ EOF
                             certifi charset-normalizer colorama Deprecated distlib filelock idna importlib-resources \
                             jmespath jsonschema misp-stix pipenv platformdirs pyasn1 pycparser pymisp pyrsistent python-dateutil \
                             PyYAML requests requests-futures rsa six urllib3 virtualenv virtualenv-clone wrapt \
-                            zmq redis pyaml tldextract markdown2
+                            zmq redis pyaml tldextract markdown2 \                                                    
+                            setuptools feedparser bs4 markdownify flask scraper
                             
+    RUN mkdir /var/log/supervisor
     # Copy all our image specific files to appropriate locations
     COPY files/ /
     ENTRYPOINT [ "/entrypoint.sh" ]
