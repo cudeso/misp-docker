@@ -148,8 +148,8 @@ FROM php-base AS python-build
     ARG PYPI_CYBOX_VERSION
     ARG PYPI_PYMISP_VERSION
     ARG PYPI_MISP_STIX_VERSION
-    ARG PYPI_SETUPTOOLS
-    ARG PYPI_SUPERVISOR
+    ARG PYPI_SETUPTOOLS_VERSION
+    ARG PYPI_SUPERVISOR_VERSION
 
     RUN apt-get install -y --no-install-recommends \
         git \
@@ -288,7 +288,7 @@ FROM php-base
                 unzip \
                 zip \
                 curl \
-                uuid-runtime \                
+                uuid-runtime \
                 jq
         fi
         apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*

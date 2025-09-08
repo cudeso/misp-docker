@@ -418,6 +418,3 @@ RUN bash <<-'EOF'
 ```
 
 to ensure variables are expanded as expected. For reference, this problem first occurred after successfully building an image but getting a `/usr/local/bin/supervisord: No such file or directory` error after starting the container. See [265](https://github.com/MISP/misp-docker/issues/265) and [273](https://github.com/MISP/misp-docker/pull/273) for more details.
-
-
-By following these steps, you can efficiently troubleshoot and resolve build issues. If problems persist, include your build log and environment details when opening an issue for assistance.
