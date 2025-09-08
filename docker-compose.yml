@@ -73,8 +73,8 @@ services:
           - PYPI_CYBOX_VERSION=${PYPI_CYBOX_VERSION}
           - PYPI_PYMISP_VERSION=${PYPI_PYMISP_VERSION}
           - PYPI_MISP_STIX_VERSION=${PYPI_MISP_STIX_VERSION}
-          - PYPI_SETUPTOOLS=${PYPI_SETUPTOOLS}
-          - PYPI_SUPERVISOR=${PYPI_SUPERVISOR}
+          - PYPI_SETUPTOOLS_VERSION=${PYPI_SETUPTOOLS_VERSION}
+          - PYPI_SUPERVISOR_VERSION=${PYPI_SUPERVISOR_VERSION}
     depends_on:
       redis:
         condition: service_healthy
@@ -279,10 +279,10 @@ services:
       start_interval: 5s
     volumes:
       # custom MISP modules are loaded at startup time
-      - ${DATA_DIR:-./data}/custom/action_mod/:/custom/action_mod/
-      - ${DATA_DIR:-./data}/custom/expansion/:/custom/expansion/
-      - ${DATA_DIR:-./data}/custom/export_mod/:/custom/export_mod/
-      - ${DATA_DIR:-./data}/custom/import_mod/:/custom/import_mod/
+      - ${DATA_DIR:-./data}/custom/action_mod/:/custom/action_mod/:Z
+      - ${DATA_DIR:-./data}/custom/expansion/:/custom/expansion/:Z
+      - ${DATA_DIR:-./data}/custom/export_mod/:/custom/export_mod/:Z
+      - ${DATA_DIR:-./data}/custom/import_mod/:/custom/import_mod/:Z
       
 volumes:
     mysql_data:

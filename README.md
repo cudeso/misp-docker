@@ -10,12 +10,13 @@ Notable features:
 -   Docker images are pushed regularly, no build required
 -   Lightweight Docker images by using multiple build stages and a slim parent image
 -   Rely on off the shelf Docker images for Exim4, Redis, and MariaDB
--   Cron jobs run updates, pushes, and pulls
+-   Scheduled tasks run updates, pushes, and pulls
 -   Fix supervisord process control (processes are correctly terminated upon reload)
 -   Fix schema update by making it completely offline (no user interaction required)
 -   Fix enforcement of permissions
 -   Fix MISP modules loading of faup library
 -   Fix MISP modules loading of gl library
+-   Authentication using LDAP or OIDC
 -   Add support for new background job [system](https://github.com/MISP/MISP/blob/2.4/docs/background-jobs-migration-guide.md)
 -   Add support for building specific MISP and MISP-modules commits
 -   Add automatic configuration of syncservers (see `configure_misp.sh`)
@@ -95,13 +96,21 @@ To override these behaviours edit the docker-compose.yml file's misp-core volume
 If it is just a default setting that is meant to be set if not already set by the user, add it in one of the `*.default.json` files.
 If it is a setting controlled by an environment variable which is meant to override whatever is set, add it in one of the `*.envars.json` files (note that you can still specify a default value).
 
+### Authentication
+
 #### LDAP Authentication
 
 You can configure LDAP authentication in MISP using 2 methods:
 -  native plugin: LdapAuth (https://github.com/MISP/MISP/tree/2.5/app/Plugin/LdapAuth) 
 -  previous approach with ApacheSecureAuth (https://gist.github.com/Kagee/f35ed25216369481437210753959d372). 
 
-LdapAuth is to be recommended, because it doesn't require rproxy apache with the ldap module.
+LdapAuth is recommended over ApacheSecureAuth because it doesn't require rproxy apache with the ldap module.
+
+#### OIDC Authentication
+
+OIDC Auth is implemented through the MISP OidcAuth plugin.
+
+For example configuration using KeyCloak, see [MISP Keycloak 26.1.x Basic Integration Guide](docs/keycloak-integration-guide.md)
 
 ### Production
 
@@ -128,6 +137,13 @@ Using a slow disk as the mounted volume or a volume with high latency like NFS, 
     - `./terms`: `/var/www/MISP/app/files/terms`
     - `./attachments`: `/var/www/MISP/app/attachments`
 - Set the environment variable `ATTACHMENTS_DIR` to the above folder location (it is important that it doesn't replace the `/var/www/MISP/app/files/` folder). 
+
+### SELinux
+
+On systems using SELinux, volume binds are not given write permissions by default. Using the tag `:Z` or `:z` at the end of a volume bind files grants write permission through SELinux.
+
+- The `Z` option tells Docker to label the content with a private unshared label.
+- The `z` option tells Docker that two containers share the volume content.
 
 ## Installing custom root CA certificates
 
@@ -389,7 +405,7 @@ EOF
 
 ### Variables not expanding
 
-Older versions of Podman may not expand variables correctly inside shell blocks. If you encounter this, ensure you are using the correct shell syntax. For Podman, replace:
+Older versions (pre version 5) of Podman may not expand variables correctly inside shell blocks. If you encounter this, ensure you are using the correct shell syntax. For Podman, replace:
 
 ```
 RUN <<-EOF

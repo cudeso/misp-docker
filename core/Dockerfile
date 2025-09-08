@@ -248,6 +248,7 @@ FROM php-base
                 unzip \
                 zip \
                 curl \
+                uuid-runtime \
                 jq
         else
             apt-get install -y --no-install-recommends \
@@ -287,6 +288,7 @@ FROM php-base
                 unzip \
                 zip \
                 curl \
+                uuid-runtime \                
                 jq
         fi
         apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
