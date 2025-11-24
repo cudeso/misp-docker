@@ -15,12 +15,21 @@ export MYSQL_DATABASE=${MYSQL_DATABASE:-misp}
 export MYSQL_CMD="mysql -u $MYSQL_USER -p$MYSQL_PASSWORD -P $MYSQL_PORT -h $MYSQL_HOST -r -N $MYSQL_DATABASE"
 export REDIS_HOST=${REDIS_HOST:-redis}
 export REDIS_PORT=${REDIS_PORT:-6379}
-export REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
+export ENABLE_REDIS_EMPTY_PASSWORD=${ENABLE_REDIS_EMPTY_PASSWORD:-false}
+
+# Set Redis password based on ENABLE_REDIS_EMPTY_PASSWORD setting
+if [ "$ENABLE_REDIS_EMPTY_PASSWORD" = "true" ]; then
+    # This still need to be set to empty string to ensure all places where it's used got the correct value
+    export REDIS_PASSWORD=""
+else
+    export REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
+fi
 export BASE_URL=${BASE_URL:-https://localhost}
 export DISABLE_IPV6=${DISABLE_IPV6:-false}
 export DISABLE_SSL_REDIRECT=${DISABLE_SSL_REDIRECT:-false}
 export DISABLE_CA_REFRESH=${DISABLE_CA_REFRESH:-false}
 export SMTP_FQDN=${SMTP_FQDN:-mail}
+export SMTP_PORT=${SMTP_PORT:-25}
 
 export CRON_USER_ID=${CRON_USER_ID:-1}
 export CRON_PULLALL=${CRON_PULLALL:-86400}
@@ -33,6 +42,7 @@ export ATTACHMENTS_DIR=${ATTACHMENTS_DIR:-/var/www/MISP/app/files}
 
 export AUTOCONF_GPG=${AUTOCONF_GPG:-true}
 export AUTOCONF_ADMIN_KEY=${AUTOCONF_ADMIN_KEY:-true}
+export AUTOGEN_ADMIN_KEY=${AUTOGEN_ADMIN_KEY:-$AUTOCONF_ADMIN_KEY}
 export OIDC_ENABLE=${OIDC_ENABLE:-false}
 export OIDC_MIXEDAUTH=${OIDC_MIXEDAUTH:-false}
 export LDAP_ENABLE=${LDAP_ENABLE:-false}
@@ -76,5 +86,14 @@ export NGINX_X_FORWARDED_FOR=${NGINX_X_FORWARDED_FOR:-false}
 export NGINX_SET_REAL_IP_FROM=${NGINX_SET_REAL_IP_FROM}
 export NGINX_CLIENT_MAX_BODY_SIZE=${NGINX_CLIENT_MAX_BODY_SIZE:-50M}
 
+export SUPERVISOR_HOST=${SUPERVISOR_HOST:-127.0.0.1}
+export SUPERVISOR_USERNAME=${SUPERVISOR_USERNAME:-supervisor}
+export SUPERVISOR_PASSWORD=${SUPERVISOR_PASSWORD:-supervisor}
+
+# Hinders further execution when sourced from other scripts
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    return
+fi
+
 # start supervisord using the main configuration file so we have a socket interface
-/usr/local/bin/supervisord -c /etc/supervisor/supervisord.conf
+exec /usr/bin/tini -- /usr/local/bin/supervisord -c /etc/supervisor/supervisord.conf
