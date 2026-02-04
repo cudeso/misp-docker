@@ -44,7 +44,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     cap_add:
-      - SYS_NICE  # CAP_SYS_NICE Prevent runaway mysql log
+      - SYS_NICE # CAP_SYS_NICE Prevent runaway mysql log
     healthcheck:
       test: mysqladmin --user=$$MYSQL_USER --password=$$MYSQL_PASSWORD status
       interval: 2s
@@ -55,6 +55,7 @@ services:
 
   misp-core:
     image: ghcr.io/misp/misp-docker/misp-core:${CORE_RUNNING_TAG:-latest}
+    restart: always
     cap_add:
       - AUDIT_WRITE
     build:
@@ -62,7 +63,7 @@ services:
       args:
           - CORE_TAG=${CORE_TAG:?Missing or outdated .env file, see README.md for instructions}
           - CORE_COMMIT=${CORE_COMMIT}
-          - CORE_FLAVOR=${CORE_FLAVOR:-full}
+          - CORE_FLAVOR=${CORE_FLAVOR:-standard}
           - PHP_VER=${PHP_VER:?Missing or outdated .env file, see README.md for instructions}
           - PYPI_REDIS_VERSION=${PYPI_REDIS_VERSION}
           - PYPI_LIEF_VERSION=${PYPI_LIEF_VERSION}
@@ -127,6 +128,8 @@ services:
       - "DISABLE_PRINTING_PLAINTEXT_CREDENTIALS=${DISABLE_PRINTING_PLAINTEXT_CREDENTIALS}"
       # standard settings
       - "ADMIN_EMAIL=${ADMIN_EMAIL}"
+      - "MISP_CONTACT=${MISP_CONTACT}"
+      - "MISP_EMAIL=${MISP_EMAIL}"      
       - "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
       - "ADMIN_KEY=${ADMIN_KEY}"
       - "ADMIN_ORG=${ADMIN_ORG}"
@@ -148,6 +151,8 @@ services:
       - "OIDC_REDIRECT_URI=${OIDC_REDIRECT_URI}"
       - "OIDC_SCOPES=${OIDC_SCOPES}"      
       - "OIDC_LOGOUT_URL=${OIDC_LOGOUT_URL}"
+      - "OIDC_DISABLE_REQUEST_OBJECT=${OIDC_DISABLE_REQUEST_OBJECT}"
+      - "OIDC_SKIP_PROXY=${OIDC_SKIP_PROXY}"      
       # APACHESECUREAUTH authentication settings
       - "APACHESECUREAUTH_LDAP_OLD_VAR_DETECT=${LDAP_ENABLE}"
       - "APACHESECUREAUTH_LDAP_ENABLE=${APACHESECUREAUTH_LDAP_ENABLE:-${LDAP_ENABLE}}"
@@ -238,6 +243,11 @@ services:
       - "MYSQL_USER=${MYSQL_USER:-misp}"
       - "MYSQL_PASSWORD=${MYSQL_PASSWORD:-example}"
       - "MYSQL_DATABASE=${MYSQL_DATABASE:-misp}"
+      # mysql TLS settings
+      - "MYSQL_TLS=${MYSQL_TLS:-false}"
+      - "MYSQL_TLS_CA=${MYSQL_TLS_CA}"
+      - "MYSQL_TLS_CERT=${MYSQL_TLS_CERT}"
+      - "MYSQL_TLS_KEY=${MYSQL_TLS_KEY}"      
       # redis settings
       - "REDIS_HOST=${REDIS_HOST:-redis}"
       - "REDIS_PORT=${REDIS_PORT:-6379}"
@@ -279,15 +289,18 @@ services:
       - "HSTS_MAX_AGE=${HSTS_MAX_AGE}"
       - "X_FRAME_OPTIONS=${X_FRAME_OPTIONS}"
       - "CONTENT_SECURITY_POLICY=${CONTENT_SECURITY_POLICY}"
+      # compose profiles
+      - "COMPOSE_PROFILES=${COMPOSE_PROFILES}"
 
   misp-modules:
     image: ghcr.io/misp/misp-docker/misp-modules:${MODULES_RUNNING_TAG:-latest}
+    restart: always
     build:
       context: modules/.
       args:
         - MODULES_TAG=${MODULES_TAG:?Missing or outdated .env file, see README.md for instructions}
         - MODULES_COMMIT=${MODULES_COMMIT}
-        - MODULES_FLAVOR=${MODULES_FLAVOR:-full}
+        - MODULES_FLAVOR=${MODULES_FLAVOR:-standard}
     healthcheck:
       test: "/bin/bash -c '</dev/tcp/localhost/6666'"
       interval: 2s

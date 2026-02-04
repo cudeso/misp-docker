@@ -43,7 +43,7 @@ change_php_vars() {
         else
             echo "ERROR: REDIS_PASSWORD is not set but ENABLE_REDIS_EMPTY_PASSWORD is false. Please set REDIS_PASSWORD or enable ENABLE_REDIS_EMPTY_PASSWORD=true for passwordless Redis."
             exit 1
-        fi 
+        fi
         sed -i "s/session.sid_length = .*/session.sid_length = 64/" "$FILE"
         sed -i "s/session.use_strict_mode = .*/session.use_strict_mode = 1/" "$FILE"
         echo "Configure PHP | Setting 'date.timezone = ${PHP_TIMEZONE}'"
@@ -77,7 +77,7 @@ change_php_vars() {
             echo "Configure PHP | Disabling 'pm.status_listen'"
             sed -i -E "s/^pm.status_listen =/;pm.status_listen =/" "$FILE"
         fi
-                if [[ -n "$PHP_LISTEN_FPM" ]]; then
+        if [[ -n "$PHP_LISTEN_FPM" ]]; then
             echo "Configure PHP | Setting 'listen' to [::]:9002"
             sed -i "/^listen =/s@=.*@= [::]:9002@" "$FILE"
         fi
@@ -93,7 +93,7 @@ fi
 echo "Configure PHP | Change PHP values ..." && change_php_vars
 
 echo "Configure PHP | Starting PHP FPM"
-/usr/sbin/php-fpm8.2 -R -F & master_pid=$!
+/usr/sbin/php-fpm8.4 -R -F & master_pid=$!
 
 # Wait for it
 wait "$master_pid"

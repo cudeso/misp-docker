@@ -1,6 +1,7 @@
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
 
     # disable access logs
     access_log off;
@@ -15,7 +16,6 @@ server {
     ssl_session_tickets off;
 
     # ssl intermediate configuration
-    ssl_dhparam /etc/nginx/certs/dhparams.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ecdh_curve X25519:prime256v1:secp384r1;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;

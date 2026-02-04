@@ -7,8 +7,8 @@ source /utilities.sh
 # envsubst won't evaluate anything like $() or conditional variable expansion so lets do that here
 export PYTHON_BIN="$(which python3)"
 export GPG_BINARY="$(which gpg)"
-export SETTING_CONTACT="${MISP_CONTACT-$ADMIN_EMAIL}"
-export SETTING_EMAIL="${MISP_EMAIL-$ADMIN_EMAIL}"
+export SETTING_CONTACT="${MISP_CONTACT}"
+export SETTING_EMAIL="${MISP_EMAIL}"
 
 init_minimum_config() {
     # Temporarily disable DB to apply config file settings, reenable after if needed 
@@ -43,7 +43,7 @@ configure_gnupg() {
 Key-Type: RSA
 Key-Length: 3072
 Name-Real: MISP Admin
-Name-Email: ${MISP_EMAIL-$ADMIN_EMAIL}
+Name-Email: ${MISP_EMAIL}
 Expire-Date: 0
 Passphrase: $GPG_PASSPHRASE
 %commit
@@ -63,7 +63,7 @@ GPGEOF
 
     if [ ! -f ${GPG_ASC} ]; then
         echo "... exporting GPG key"
-        sudo -u www-data gpg --homedir ${GPG_DIR} --export --armor ${MISP_EMAIL-$ADMIN_EMAIL} > ${GPG_ASC}
+        sudo -u www-data gpg --homedir ${GPG_DIR} --export --armor ${MISP_EMAIL} > ${GPG_ASC}
     else
         echo "... found exported key ${GPG_ASC}"
     fi
@@ -99,7 +99,11 @@ set_up_oidc() {
                 \"roles_property\": \"${OIDC_ROLES_PROPERTY}\",
                 \"role_mapper\": ${OIDC_ROLES_MAPPING},
                 \"default_org\": \"${OIDC_DEFAULT_ORG}\",
-                \"mixedAuth\": ${OIDC_MIXEDAUTH}
+                \"mixedAuth\": ${OIDC_MIXEDAUTH},
+                \"authentication_method\": \"${OIDC_AUTH_METHOD}\",
+                \"redirect_uri\": \"${OIDC_REDIRECT_URI}\",
+                \"disable_request_object\": \"${OIDC_DISABLE_REQUEST_OBJECT}\",
+                \"skipProxy\": ${OIDC_SKIP_PROXY}
             }
         }" > /dev/null
 
@@ -350,22 +354,39 @@ init_user() {
     fi
 
     if [ -n "$ADMIN_KEY" ]; then
-        echo "... setting admin key to '${ADMIN_KEY}'"
+        if [ "$DISABLE_PRINTING_PLAINTEXT_CREDENTIALS" == "true" ]; then
+            echo "... setting admin key from environment variable"
+        else
+            echo "... setting admin key to '${ADMIN_KEY}'"
+        fi
         CHANGE_CMD=(sudo -u www-data /var/www/MISP/app/Console/cake User change_authkey 1 "${ADMIN_KEY}")
     elif [ -z "$ADMIN_KEY" ] && [ "$AUTOGEN_ADMIN_KEY" == "true" ]; then
-        echo "... regenerating admin key (set \$ADMIN_KEY if you want it to change)"
-        CHANGE_CMD=(sudo -u www-data /var/www/MISP/app/Console/cake User change_authkey 1)
+        HAS_VALID_KEY=$($MYSQL_CMD -N -s -e 'SELECT EXISTS(SELECT 1 FROM auth_keys WHERE user_id = 1 AND (expiration = 0 OR expiration > UNIX_TIMESTAMP()));')
+	if (( HAS_VALID_KEY == 0 )); then
+            echo "... regenerating admin key (set \$ADMIN_KEY if you want it to change)"
+            CHANGE_CMD=(sudo -u www-data /var/www/MISP/app/Console/cake User change_authkey 1)
+	else
+	    echo "... valid admin key for admin user found, not changing"
+	fi
     else
         echo "... admin user key auto generation disabled"
     fi
 
     if [[ -v CHANGE_CMD[@] ]]; then
         ADMIN_KEY=$("${CHANGE_CMD[@]}" | awk 'END {print $NF; exit}')
-        echo "... admin user key set to '${ADMIN_KEY}'"
+        if [ "$DISABLE_PRINTING_PLAINTEXT_CREDENTIALS" == "true" ]; then
+            echo "... admin user key set"
+        else
+            echo "... admin user key set to '${ADMIN_KEY}'"
+        fi
     fi
 
     if [ ! -z "$ADMIN_PASSWORD" ]; then
-        echo "... setting admin password to '${ADMIN_PASSWORD}'"
+        if [ "$DISABLE_PRINTING_PLAINTEXT_CREDENTIALS" == "true" ]; then
+            echo "... setting admin password from environment variable"
+        else
+            echo "... setting admin password to '${ADMIN_PASSWORD}'"
+        fi
         PASSWORD_POLICY=$(sudo -u www-data /var/www/MISP/app/Console/cake Admin getSetting "Security.password_policy_complexity" | jq ".value" -r)
         PASSWORD_LENGTH=$(sudo -u www-data /var/www/MISP/app/Console/cake Admin getSetting "Security.password_policy_length" | jq ".value" -r)
         sudo -u www-data /var/www/MISP/app/Console/cake Admin setSetting -q "Security.password_policy_length" 1
@@ -396,6 +417,12 @@ apply_critical_fixes() {
 
 apply_optional_fixes() {
     init_settings "optional"
+}
+
+apply_storage_settings() {
+    if [[ -n "$S3_ACCESS_KEY" && -n "$S3_SECRET_KEY" && -n "$S3_BUCKET" && -n "$S3_ENDPOINT" ]]; then
+        init_settings "s3"
+    fi
 }
 
 # Some settings return a value from cake Admin getSetting even if not set in config.php and database.
@@ -437,6 +464,14 @@ update_ca_certificates() {
     else
         echo "Updating /var/www/MISP/app/Lib/cakephp/lib/Cake/Config/cacert.pem using curl data..."
         sudo -E -u www-data curl -s --etag-compare /var/www/MISP/app/Lib/cakephp/lib/Cake/Config/etag.txt --etag-save /var/www/MISP/app/Lib/cakephp/lib/Cake/Config/etag.txt https://curl.se/ca/cacert.pem -o /var/www/MISP/app/Lib/cakephp/lib/Cake/Config/cacert.pem
+    fi
+}
+
+configure_misp_guard_ca() {
+    if [[ "$COMPOSE_PROFILES" = "misp-guard" ]]; then
+        echo "... configuring misp-guard CA certificate"
+        chown www-data:www-data /usr/local/share/ca-certificates/misp_guard/mitmproxy-ca.pem
+        sudo -u www-data /var/www/MISP/app/Console/cake Admin setSetting -q "MISP.ca_path" "/usr/local/share/ca-certificates/misp_guard/mitmproxy-ca.pem"
     fi
 }
 
@@ -536,10 +571,10 @@ create_default_scheduled_tasks() {
         ON DUPLICATE KEY UPDATE user_id=$CRON_USER_ID;" | ${MYSQL_CMD}
     echo "INSERT IGNORE INTO $MYSQL_DATABASE.scheduled_tasks (id, type, timer, description, user_id, action, params, enabled, next_execution_time, message) \
         VALUES (3, 'Server', $PULLALL_INTERVAL, 'Daily pull of all Servers', $CRON_USER_ID, 'pull', 'all,full', 1, 0, '') \
-        ON DUPLICATE KEY UPDATE user_id=$CRON_USER_ID AND timer=$PULLALL_INTERVAL;" | ${MYSQL_CMD}
+        ON DUPLICATE KEY UPDATE user_id=$CRON_USER_ID, timer=$PULLALL_INTERVAL;" | ${MYSQL_CMD}
     echo "INSERT IGNORE INTO $MYSQL_DATABASE.scheduled_tasks (id, type, timer, description, user_id, action, params, enabled, next_execution_time, message) \
         VALUES (4, 'Server', $PUSHALL_INTERVAL, 'Daily push of all Servers', $CRON_USER_ID, 'push', 'all,full', 1, 0, '') \
-        ON DUPLICATE KEY UPDATE user_id=$CRON_USER_ID AND timer=$PUSHALL_INTERVAL;" | ${MYSQL_CMD}
+        ON DUPLICATE KEY UPDATE user_id=$CRON_USER_ID, timer=$PUSHALL_INTERVAL;" | ${MYSQL_CMD}
     echo "INSERT IGNORE INTO $MYSQL_DATABASE.scheduled_tasks (id, type, timer, description, user_id, action, enabled, next_execution_time, message) \
         VALUES (5, 'Admin', 86400, 'Daily update of Galaxies', $CRON_USER_ID, 'updateGalaxies', 1, 0, '') \
         ON DUPLICATE KEY UPDATE user_id=$CRON_USER_ID;" | ${MYSQL_CMD}
@@ -555,6 +590,16 @@ create_default_scheduled_tasks() {
     echo "INSERT IGNORE INTO $MYSQL_DATABASE.scheduled_tasks (id, type, timer, description, user_id, action, enabled, next_execution_time, message) \
         VALUES (9, 'Admin', 86400, 'Daily update of Object Templates', $CRON_USER_ID, 'updateObjectTemplates', 1, 0, '') \
         ON DUPLICATE KEY UPDATE user_id=$CRON_USER_ID;" | ${MYSQL_CMD}
+}
+
+print_version() {
+    VERSION_FILE="/var/www/MISP/VERSION.json"
+    if [[ -f "$VERSION_FILE" ]]; then
+        VERSION=$(jq -r '"\(.major).\(.minor).\(.hotfix)"' ${VERSION_FILE})
+    else
+        VERSION="unknown"
+    fi
+    echo "MISP | Version: ${VERSION}"
 }
 
 echo "MISP | Update CA certificates ..." && update_ca_certificates
@@ -577,6 +622,8 @@ echo "MISP | Start component updates ..." && update_components
 
 echo "MISP | Resolve non-critical issues ..." && apply_optional_fixes
 
+echo "MISP | Configure storage ..." && apply_storage_settings
+
 echo "MISP | Create sync servers ..." && create_sync_servers
 
 echo "MISP | Set Up OIDC ..." && set_up_oidc
@@ -593,5 +640,7 @@ echo "MISP | Set Up Proxy ..." && set_up_proxy
 
 echo "MISP | Create default Scheduled Tasks ..." && create_default_scheduled_tasks
 
-echo "MISP | Mark instance live"
+echo "MISP | Configure misp-guard CA certificate ..." && configure_misp_guard_ca
+
+echo "MISP | Mark instance live" && print_version
 sudo -u www-data /var/www/MISP/app/Console/cake Admin live 1

@@ -2,6 +2,10 @@ variable "PLATFORMS" {
   default = ["linux/amd64", "linux/arm64"]
 }
 
+variable "DOCKER_HUB_PROXY" {
+  default = ""
+}
+
 variable "PYPI_REDIS_VERSION" {
   default = ""
 }
@@ -100,6 +104,21 @@ group "default" {
   ]
 }
 
+group "slim" {
+  targets = [
+    "misp-modules-slim",
+    "misp-core-slim",
+    "misp-guard",
+  ]
+}
+group "standard" {
+  targets = [
+    "misp-modules",
+    "misp-core",
+    "misp-guard",
+  ]
+}
+
 target "misp-modules" {
   context = "modules/."
   dockerfile = "Dockerfile"
@@ -107,19 +126,20 @@ target "misp-modules" {
   args = {
     "MODULES_TAG": "${MODULES_TAG}",
     "MODULES_COMMIT": "${MODULES_COMMIT}",
-    "MODULES_FLAVOR": "full",
+    "MODULES_FLAVOR": "standard",
+    "DOCKER_HUB_PROXY" : "${DOCKER_HUB_PROXY}",
   }
   platforms = "${PLATFORMS}"
 }
 
 target "misp-modules-slim" {
-  context = "modules/."
-  dockerfile = "Dockerfile"
+  inherits = [ "misp-modules" ]
   tags = flatten(["${NAMESPACE}/misp-modules:latest-slim", "${NAMESPACE}/misp-modules:${COMMIT_HASH}-slim", MODULES_TAG != "" ? ["${NAMESPACE}/misp-modules:${MODULES_TAG}-slim"] : []])
   args = {
     "MODULES_TAG": "${MODULES_TAG}",
     "MODULES_COMMIT": "${MODULES_COMMIT}",
-    "MODULES_FLAVOR": "lite",
+    "MODULES_FLAVOR": "slim",
+    "DOCKER_HUB_PROXY" : "${DOCKER_HUB_PROXY}",
   }
   platforms = "${PLATFORMS}"
 }
@@ -131,7 +151,7 @@ target "misp-core" {
   args = {
     "CORE_TAG": "${CORE_TAG}",
     "CORE_COMMIT": "${CORE_COMMIT}",
-    "CORE_FLAVOR": "full",
+    "CORE_FLAVOR": "standard",
     "PHP_VER": "${PHP_VER}",
     "PYPI_REDIS_VERSION": "${PYPI_REDIS_VERSION}",
     "PYPI_LIEF_VERSION": "${PYPI_LIEF_VERSION}",
@@ -146,18 +166,18 @@ target "misp-core" {
     "PYPI_TAXII2_CLIENT": "${PYPI_TAXII2_CLIENT}",
     "PYPI_SETUPTOOLS_VERSION": "${PYPI_SETUPTOOLS_VERSION}",
     "PYPI_SUPERVISOR_VERSION": "${PYPI_SUPERVISOR_VERSION}",
+    "DOCKER_HUB_PROXY" : "${DOCKER_HUB_PROXY}",
   }
   platforms = "${PLATFORMS}"
 }
 
 target "misp-core-slim" {
-  context = "core/."
-  dockerfile = "Dockerfile"
+  inherits = [ "misp-core" ]
   tags = flatten(["${NAMESPACE}/misp-core:latest-slim", "${NAMESPACE}/misp-core:${COMMIT_HASH}-slim", CORE_TAG != "" ? ["${NAMESPACE}/misp-core:${CORE_TAG}-slim"] : []])
   args = {
     "CORE_TAG": "${CORE_TAG}",
     "CORE_COMMIT": "${CORE_COMMIT}",
-    "CORE_FLAVOR": "lite",
+    "CORE_FLAVOR": "slim",
     "PHP_VER": "${PHP_VER}",
     "PYPI_REDIS_VERSION": "${PYPI_REDIS_VERSION}",
     "PYPI_LIEF_VERSION": "${PYPI_LIEF_VERSION}",
@@ -172,6 +192,7 @@ target "misp-core-slim" {
     "PYPI_TAXII2_CLIENT": "${PYPI_TAXII2_CLIENT}",
     "PYPI_SETUPTOOLS_VERSION": "${PYPI_SETUPTOOLS_VERSION}",
     "PYPI_SUPERVISOR_VERSION": "${PYPI_SUPERVISOR_VERSION}",
+    "DOCKER_HUB_PROXY" : "${DOCKER_HUB_PROXY}",
   }
   platforms = "${PLATFORMS}"
 }
@@ -183,6 +204,7 @@ target "misp-guard" {
   args = {
     "GUARD_TAG": "${GUARD_TAG}",
     "GUARD_COMMIT": "${GUARD_COMMIT}"
+    "DOCKER_HUB_PROXY" : "${DOCKER_HUB_PROXY}",
   }
   platforms = "${PLATFORMS}"
 }
