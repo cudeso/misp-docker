@@ -750,3 +750,4 @@ echo "MISP | Configure misp-guard CA certificate ..." && configure_misp_guard_ca
 
 echo "MISP | Mark instance live" && print_version
 sudo -u www-data /var/www/MISP/app/Console/cake Admin live 1
+

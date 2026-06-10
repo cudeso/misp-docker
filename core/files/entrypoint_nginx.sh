@@ -103,7 +103,7 @@ init_misp_data_files(){
     echo "... initialize configuration files"
     MISP_APP_CONFIG_PATH=/var/www/MISP/app/Config
     # Avoid cp/sed -i which create temp files alongside the target,
-    # broken on VirtioFS (Docker Desktop for Mac).
+    # broken on VirtioFS (Docker Desktop for Mac).    
     [ -s $MISP_APP_CONFIG_PATH/bootstrap.php ] || cat $MISP_APP_CONFIG_PATH.dist/bootstrap.default.php > $MISP_APP_CONFIG_PATH/bootstrap.php
     [ -s $MISP_APP_CONFIG_PATH/database.php ] || cat $MISP_APP_CONFIG_PATH.dist/database.default.php > $MISP_APP_CONFIG_PATH/database.php
     [ -s $MISP_APP_CONFIG_PATH/core.php ] || cat $MISP_APP_CONFIG_PATH.dist/core.default.php > $MISP_APP_CONFIG_PATH/core.php
@@ -166,7 +166,7 @@ EOT
     safe_sed_i "s/3306/$MYSQL_PORT/" $MISP_APP_CONFIG_PATH/database.php
     safe_sed_i "s/db\s*password/$MYSQL_PASSWORD/" $MISP_APP_CONFIG_PATH/database.php
     safe_sed_i "s/'database' => 'misp'/'database' => '$MYSQL_DATABASE'/" $MISP_APP_CONFIG_PATH/database.php
-
+    
     # Enable MySQL TLS immediately, as TLS requiring hosts like AWS RDS may banlist non-TLS connecting hosts
     # Conversely, this is also a good spot to disable it if required
 
@@ -267,14 +267,22 @@ enforce_misp_data_permissions(){
         echo "... local files/ match distribution version, skipping data permissions in files/"
     else
         echo "find & change ... chown -R www-data:www-data /var/www/MISP/app/tmp" && find /var/www/MISP/app/tmp \( ! -user www-data -or ! -group www-data \) -exec chown www-data:www-data {} +
-        # Enforce 0770 on all files and dirs - app/tmp contains a mix of cache, exports and temp files that all need to be writable by www-data
-        echo "find & change... chmod -R 0770 /var/www/MISP/app/tmp" && find /var/www/MISP/app/tmp ! -perm 0770 -exec chmod 0770 {} +
+        # Files are also executable and read only, because we have some rogue scripts like 'cake' and we can not do a full inventory
+        echo "... chmod -R 0550 files /var/www/MISP/app/tmp" && find /var/www/MISP/app/tmp -not -perm 550 -type f -exec chmod 0550 {} +
+        # Directories are also writable, because there seems to be a requirement to add new files every once in a while
+        echo "... chmod -R 0770 directories /var/www/MISP/app/tmp" && find /var/www/MISP/app/tmp -not -perm 770 -type d -exec chmod 0770 {} +
+        # We make 'files' and 'tmp' (logs) directories and files user and group writable (we removed the SGID bit)
+        echo "... chmod -R u+w,g+w /var/www/MISP/app/tmp" && chmod -R u+w,g+w /var/www/MISP/app/tmp
         
-        echo "find & change ... chown -R www-data:www-data /var/www/MISP/app/files" && find /var/www/MISP/app/files \( ! -user www-data -or ! -group www-data \) -exec chown www-data:www-data {} +
-        # Enforce 0770 on all files and dirs - app/files contains a mix of scripts and user data
-        echo "find & change ... chmod -R 0770 /var/www/MISP/app/files" && find /var/www/MISP/app/files ! -perm 0770 -exec chmod 0770 {} +
+        echo "... chown -R www-data:www-data /var/www/MISP/app/files" && find /var/www/MISP/app/files \( ! -user www-data -or ! -group www-data \) -exec chown www-data:www-data {} +
+        # Files are also executable and read only, because we have some rogue scripts like 'cake' and we can not do a full inventory
+        echo "... chmod -R 0550 files /var/www/MISP/app/files" && find /var/www/MISP/app/files -not -perm 550 -type f -exec chmod 0550 {} +
+        # Directories are also writable, because there seems to be a requirement to add new files every once in a while
+        echo "... chmod -R 0770 directories /var/www/MISP/app/files" && find /var/www/MISP/app/files -not -perm 770 -type d -exec chmod 0770 {} +
+        # We make 'files' and 'tmp' (logs) directories and files user and group writable (we removed the SGID bit)
+        echo "... chmod -R u+w,g+w /var/www/MISP/app/files" && chmod -R u+w,g+w /var/www/MISP/app/files
     fi
-
+    
     echo "... chown -R www-data:www-data /var/www/MISP/app/Config" && find /var/www/MISP/app/Config \( ! -user www-data -or ! -group www-data \) -exec chown www-data:www-data {} +
     # Files are also executable and read only, because we have some rogue scripts like 'cake' and we can not do a full inventory
     echo "find & change ... chmod -R 0550 files /var/www/MISP/app/Config ..." && find /var/www/MISP/app/Config -type f ! -perm 0550 -exec chmod 0550 {} +
@@ -422,13 +430,20 @@ init_nginx() {
         echo "... enabling IPv6 on port 443"
         sed -i "s/# listen \[/listen \[/" /etc/nginx/sites-enabled/misp443
     fi
-
+    
     if [[ ! -f /etc/nginx/certs/cert.pem || ! -f /etc/nginx/certs/key.pem ]]; then
         echo "... generating new self-signed TLS certificate"
         openssl req -x509 -subj '/CN=localhost' -nodes -newkey rsa:4096 -keyout /etc/nginx/certs/key.pem -out /etc/nginx/certs/cert.pem -days 365 \
             -addext "subjectAltName = DNS:localhost, IP:127.0.0.1, IP:::1"
     else
         echo "... TLS certificates found"
+    fi
+    
+    if [[ ! -f /etc/nginx/certs/dhparams.pem ]]; then
+        echo "... generating new DH parameters"
+        openssl dhparam -out /etc/nginx/certs/dhparams.pem 2048
+    else
+        echo "... DH parameters found"
     fi
 
     if [[ "$FASTCGI_STATUS_LISTEN" != "" ]]; then

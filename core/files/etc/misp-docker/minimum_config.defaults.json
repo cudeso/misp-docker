@@ -36,7 +36,7 @@
   "MISP.uuid": {
     "default_value": "",
     "command_args": "-f"
-  },
+  },  
   "Plugin.ZeroMQ_enable": {
     "default_value": false
   },

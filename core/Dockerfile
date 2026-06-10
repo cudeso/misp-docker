@@ -11,11 +11,11 @@ ARG PHP_PACKAGE_VERSION
 RUN : "${PHP_PACKAGE_VERSION:?Build argument PHP_PACKAGE_VERSION is required and cannot be empty.}"
 ARG CORE_FLAVOR
 
-# Uncomment when building in corporate environments
-# COPY ./cert.pem /usr/local/share/ca-certificates/rootca.pem
-# COPY ./cert.pem /usr/lib/ssl/cert.pem
+    # Uncomment when building in corporate environments
+    # COPY ./cert.pem /usr/local/share/ca-certificates/rootca.pem
+    # COPY ./cert.pem /usr/lib/ssl/cert.pem
 
-RUN <<-EOF
+RUN bash <<-'EOF' 
         apt-get update
         if [ "${CORE_FLAVOR}" = "slim" ]; then
             apt-get install -y --no-install-recommends \
@@ -94,15 +94,21 @@ EOF
 FROM php-base AS composer-build
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
-WORKDIR /tmp
-RUN curl -o /tmp/composer.json https://raw.githubusercontent.com/MISP/MISP/${CORE_COMMIT:-${CORE_TAG}}/app/composer.json
-RUN sed -i '/cake-resque/d' /tmp/composer.json
-RUN sed -i 's/authentication",/authentication"/' /tmp/composer.json
+    ENV DEBIAN_FRONTEND=noninteractive
+    ENV COMPOSER_ALLOW_SUPERUSER=1
+    ARG CORE_TAG
+    ARG CORE_COMMIT
+    ARG CORE_FLAVOR
 
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-RUN composer config --no-interaction allow-plugins.composer/installers true
-RUN composer install
-RUN <<-EOF
+    WORKDIR /tmp
+    RUN curl -o /tmp/composer.json https://raw.githubusercontent.com/MISP/MISP/${CORE_COMMIT:-${CORE_TAG}}/app/composer.json
+    RUN sed -i '/cake-resque/d' /tmp/composer.json
+    RUN sed -i 's/authentication",/authentication"/' /tmp/composer.json
+
+    COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+    RUN composer config --no-interaction allow-plugins.composer/installers true
+    RUN composer install
+    RUN bash <<-'EOF' 
         if [ "${CORE_FLAVOR}" = "slim" ]; then
             :
         else
@@ -116,9 +122,17 @@ EOF
 
 
 FROM php-base AS php-build
-ENV TZ=Etc/UTC
+    ENV TZ=Etc/UTC
 
-RUN <<-EOF
+ARG CORE_TAG
+ARG CORE_COMMIT
+ARG PHP_API_VERSION
+RUN : "${PHP_API_VERSION:?Build argument PHP_API_VERSION is required and cannot be empty.}"
+ARG PHP_PACKAGE_VERSION
+RUN : "${PHP_PACKAGE_VERSION:?Build argument PHP_PACKAGE_VERSION is required and cannot be empty.}"
+ARG CORE_FLAVOR
+
+    RUN bash <<-'EOF' 
         if [ "${CORE_FLAVOR}" = "slim" ]; then
             apt-get install -y --no-install-recommends \
                 gcc \
@@ -148,7 +162,7 @@ RUN update-alternatives --set php /usr/bin/php${PHP_PACKAGE_VERSION}
 RUN update-alternatives --set php-config /usr/bin/php-config${PHP_PACKAGE_VERSION}
 RUN update-alternatives --set phpize /usr/bin/phpize${PHP_PACKAGE_VERSION}
 
-RUN <<-EOF
+    RUN bash <<-'EOF' 
         pecl channel-update pecl.php.net
         if [ "${CORE_FLAVOR}" = "slim" ]; then
             tar -czf /pecl_libs.tar.gz -T /dev/null
@@ -172,16 +186,19 @@ EOF
 
 FROM php-base AS python-build
 
-RUN apt-get install -y --no-install-recommends \
+    ARG CORE_TAG
+    ARG CORE_COMMIT
+
+    RUN apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     git \
     make \
     libfuzzy-dev \
-    && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+        && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-# Download MISP using git in the /var/www/ directory. Remove unnecessary items.
-RUN <<-EOF
+    # Download MISP using git in the /var/www/ directory. Remove unnecessary items.
+    RUN bash <<-'EOF' 
         if [ ! -z "${CORE_COMMIT}" ]; then
             git clone https://github.com/MISP/MISP.git /var/www/MISP && cd /var/www/MISP && git checkout "${CORE_COMMIT}"
         else
@@ -204,7 +221,7 @@ ARG PYPI_PYTHON_MAGIC_VERSION
 ARG PYPI_PYZMQ_VERSION
 ARG PYPI_REDIS_VERSION
 ARG PYPI_TAXII2_CLIENT_VERSION
-RUN <<-EOF
+RUN bash <<-'EOF'
         mkdir /wheels
 
         # Add additional dependencies (container specific)
@@ -256,28 +273,78 @@ EOF
 FROM php-base
 
 ENV PATH="/var/www/MISP/app/Console:${PATH}"
+    ENV DEBIAN_FRONTEND=noninteractive
+    ARG CORE_TAG
+    ARG CORE_COMMIT
+    ARG PHP_PACKAGE_VERSION
+    RUN : "${PHP_PACKAGE_VERSION:?Build argument PHP_PACKAGE_VERSION is required and cannot be empty.}"
+    ARG CORE_FLAVOR
 
-# Remove some defaults (kernel logging) and fix alternatives
-RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
+    RUN bash <<-'EOF' 
+        set -euo pipefail
+        apt-get install -y --no-install-recommends \
+            gettext \
+            procps \
+            sudo \
+            nginx \
+            cron \
+            openssl \
+            gpg \
+            gpg-agent \
+            mariadb-client \
+            rsync \
+            rsyslog \
+            logrotate \
+            php${PHP_PACKAGE_VERSION} \
+            php${PHP_PACKAGE_VERSION}-apcu \
+            php${PHP_PACKAGE_VERSION}-curl \
+            php${PHP_PACKAGE_VERSION}-xml \
+            php${PHP_PACKAGE_VERSION}-intl \
+            php${PHP_PACKAGE_VERSION}-bcmath \
+            php${PHP_PACKAGE_VERSION}-mbstring \
+            php${PHP_PACKAGE_VERSION}-mysql \
+            php${PHP_PACKAGE_VERSION}-redis \
+            php${PHP_PACKAGE_VERSION}-gd \
+            php${PHP_PACKAGE_VERSION}-fpm \
+            php${PHP_PACKAGE_VERSION}-zip \
+            php${PHP_PACKAGE_VERSION}-ldap \
+            libmagic1 \
+            libldap-common \
+            librdkafka1 \
+            libbrotli1 \
+            libsimdjson25 \
+            libzstd1 \
+            ssdeep \
+            libfuzzy2 \
+            unzip \
+            zip \
+            curl \
+            uuid-runtime \
+            jq
+        apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+EOF
+
+    # Remove some defaults (kernel logging) and fix alternatives
+    RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
 RUN update-alternatives --set php /usr/bin/php${PHP_PACKAGE_VERSION}
 RUN ln -sf /usr/sbin/php-fpm${PHP_PACKAGE_VERSION} /usr/local/sbin/php-fpm
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-# Install python modules
-COPY --from=python-build /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
-# PHP: install prebuilt libraries, then install the app's PHP deps
-COPY --from=php-build /pecl_libs.tar.gz /
-RUN tar -xzf /pecl_libs.tar.gz && rm /pecl_libs.tar.gz
+    # Install python modules
+    COPY --from=python-build /wheels /wheels
+    RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
+    # PHP: install prebuilt libraries, then install the app's PHP deps
+    COPY --from=php-build /pecl_libs.tar.gz /
+    RUN tar -xzf /pecl_libs.tar.gz && rm /pecl_libs.tar.gz
 
-# Do an early chown to limit image size
-COPY --from=python-build --chown=www-data:www-data --chmod=0550 /var/www/MISP /var/www/MISP
-COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/composer.lock /var/www/MISP/app/composer.lock
-COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/Vendor /var/www/MISP/app/Vendor
-COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/Plugin /var/www/MISP/app/Plugin
+    # Do an early chown to limit image size
+    COPY --from=python-build --chown=www-data:www-data --chmod=0550 /var/www/MISP /var/www/MISP
+    COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/composer.lock /var/www/MISP/app/composer.lock
+    COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/Vendor /var/www/MISP/app/Vendor
+    COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/Plugin /var/www/MISP/app/Plugin
 
-# Gather these in one layer, only act on actual directories under /etc/php/
-RUN <<-EOF
+    # Gather these in one layer, only act on actual directories under /etc/php/
+    RUN bash <<-'EOF' 
         if [ "${CORE_FLAVOR}" = "slim" ]; then
             set -- 
         else
@@ -292,17 +359,17 @@ RUN <<-EOF
         phpenmod redis
 EOF
 
-# nginx
-RUN rm /etc/nginx/sites-enabled/*; mkdir -p /run/php /etc/nginx/certs
+    # nginx
+    RUN rm /etc/nginx/sites-enabled/*; mkdir -p /run/php /etc/nginx/certs
 
-# Make a copy of the file and configuration stores, so we can sync from it
+    # Make a copy of the file and configuration stores, so we can sync from it
 
-# The spirit of the upstream dockerization is to make:
-#   1) User and group aligned in terms of permissions
-#   2) Files executable and read only, because of some rogue scripts like 'cake'
-#   3) Directories writable, because sometimes MISP add new files
+    # The spirit of the upstream dockerization is to make:
+    #   1) User and group aligned in terms of permissions
+    #   2) Files executable and read only, because of some rogue scripts like 'cake'
+    #   3) Directories writable, because sometimes MISP add new files
 
-RUN <<-EOF
+    RUN bash <<-'EOF' 
         cp -R /var/www/MISP/app/files /var/www/MISP/app/files.dist
         echo "${CORE_COMMIT:-${CORE_TAG}}" > /var/www/MISP/app/files/VERSION
         cp -R /var/www/MISP/app/Config /var/www/MISP/app/Config.dist
@@ -313,11 +380,30 @@ RUN <<-EOF
         touch /var/www/MISP/.git/ORIG_HEAD && chmod 0600 /var/www/MISP/.git/ORIG_HEAD && chown www-data:www-data /var/www/MISP/.git/ORIG_HEAD
 EOF
 
-# Copy all our image specific files to appropriate locations
-COPY files/ /
-# Template PHP version into nginx config
-RUN sed -i "s/@PHP_PACKAGE_VERSION@/${PHP_PACKAGE_VERSION}/g" /etc/nginx/includes/misp
-ENTRYPOINT [ "/entrypoint.sh" ]
+    # Customisations        
+    COPY files/etc/logger/40-misp.conf /etc/rsyslog.d/
+    COPY files/etc/logger/misp.logrotate /etc/logrotate.d/misp
+    RUN chmod og-w /etc/logrotate.d/misp
 
-# Change Workdirectory
-WORKDIR /var/www/MISP
+    RUN mkdir /var/www/MISP/app/webroot/misp-export
+    RUN mkdir /var/www/MISP/misp-custom
+    RUN mkdir /var/www/MISP/misp-custom/scripts
+    RUN /usr/local/bin/python -m venv /var/www/MISP/misp-custom/venv
+    WORKDIR /var/www/MISP/misp-custom/scripts
+    RUN /var/www/MISP/misp-custom/venv/bin/pip install asn1crypto attrs azure-keyvault-secrets azure-identity \
+                            certifi charset-normalizer colorama Deprecated distlib filelock idna importlib-resources \
+                            jmespath jsonschema misp-stix pipenv platformdirs pyasn1 pycparser pymisp pyrsistent python-dateutil \
+                            PyYAML requests requests-futures rsa six urllib3 virtualenv virtualenv-clone wrapt \
+                            zmq redis pyaml tldextract markdown2 \                                                    
+                            setuptools feedparser bs4 markdownify flask scraper
+                            
+    RUN mkdir /var/log/supervisor
+    # Copy all our image specific files to appropriate locations
+    COPY files/ /
+    # Template PHP version into nginx config
+    RUN sed -i "s/@PHP_PACKAGE_VERSION@/${PHP_PACKAGE_VERSION}/g" /etc/nginx/includes/misp
+    ENTRYPOINT [ "/entrypoint.sh" ]
+
+    # Change Workdirectory
+    WORKDIR /var/www/MISP
+
