@@ -20,32 +20,22 @@ services:
       - "REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}"
       - "TZ=${TZ:-UTC}"
       - "DISABLE_REDIS_SNAPSHOT=${DISABLE_REDIS_SNAPSHOT:-false}"
+    healthcheck:
+      test: |
+        sh -c '
+          if [ "$${ENABLE_REDIS_EMPTY_PASSWORD:-false}" = "true" ]; then
+            valkey-cli -p $${REDIS_PORT:-6379} ping | grep -q PONG || exit 1
+          else
+            valkey-cli -a "$${REDIS_PASSWORD:-redispassword}" -p $${REDIS_PORT:-6379} ping | grep -q PONG || exit 1
+          fi
+        '
+      interval: 2s
+      timeout: 1s
+      retries: 3
+      start_period: 5s
+      start_interval: 5s
     volumes:
       - cache_data:/data:Z      
-
-  db:
-      # We use MariaDB because it supports ARM and has the expected collations
-      image: ${REGISTRY_MIRROR_URL:-}mariadb:10.11
-      restart: always
-      environment:
-        - "MYSQL_USER=${MYSQL_USER:-misp}"
-        - "MYSQL_PASSWORD=${MYSQL_PASSWORD:-example}"
-        - "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-password}"
-        - "MYSQL_DATABASE=${MYSQL_DATABASE:-misp}"
-        - "TZ=${TZ:-UTC}"
-      command: "\
-        --innodb-buffer-pool-size=${INNODB_BUFFER_POOL_SIZE:-2048M} \
-        --innodb-change-buffering=${INNODB_CHANGE_BUFFERING:-none} \
-        --innodb-io-capacity=${INNODB_IO_CAPACITY:-1000} \
-        --innodb-io-capacity-max=${INNODB_IO_CAPACITY_MAX:-2000} \
-        --innodb-log-file-size=${INNODB_LOG_FILE_SIZE:-600M} \
-        --innodb-read-io-threads=${INNODB_READ_IO_THREADS:-16} \
-        --innodb-stats-persistent=${INNODB_STATS_PERSISTENT:-ON} \
-        --innodb-write-io-threads=${INNODB_WRITE_IO_THREADS:-4}"
-      volumes:
-        - mysql_data:/var/lib/mysql:Z
-      cap_add:
-        - SYS_NICE # CAP_SYS_NICE Prevent runaway mysql log
 
   misp-core:
     image: ${REGISTRY_MIRROR_URL:-}ghcr.io/misp/misp-docker/misp-core:${CORE_RUNNING_TAG:-latest}
@@ -73,9 +63,19 @@ services:
           - PYPI_REDIS_VERSION=${PYPI_REDIS_VERSION}
           - PYPI_TAXII2_CLIENT_VERSION=${PYPI_TAXII2_CLIENT_VERSION}
     depends_on:
-      - redis
-      - db
-      - misp-modules
+      redis:
+        condition: service_healthy
+      #db:
+      #  condition: service_healthy
+      misp-modules:
+        condition: service_healthy
+    healthcheck:
+      test: curl -ks ${BASE_URL:-https://localhost}/users/heartbeat > /dev/null || exit 1
+      interval: 2s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
+      start_interval: 30s
     ports:
       - "${CORE_HTTP_PORT:-80}:80"
       - "${CORE_HTTPS_PORT:-443}:443"
@@ -296,6 +296,13 @@ services:
         - MODULES_TAG=${MODULES_TAG:?Missing or outdated .env file, see README.md for instructions}
         - MODULES_COMMIT=${MODULES_COMMIT}
         - MODULES_FLAVOR=${MODULES_FLAVOR:-standard}
+    healthcheck:
+      test: "/bin/bash -c '</dev/tcp/localhost/6666'"
+      interval: 2s
+      timeout: 1s
+      retries: 3
+      start_period: 5s
+      start_interval: 5s
     volumes:
       # custom MISP modules are loaded at startup time
       - ${DATA_DIR:-./data}/custom/action_mod/:/custom/action_mod/:Z
@@ -306,6 +313,5 @@ services:
       - "TZ=${TZ:-UTC}"
 
 volumes:
-    mysql_data:
     cache_data:
             
