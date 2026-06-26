@@ -43,7 +43,7 @@ services:
         --innodb-stats-persistent=${INNODB_STATS_PERSISTENT:-ON} \
         --innodb-write-io-threads=${INNODB_WRITE_IO_THREADS:-4}"
       volumes:
-        - mysql_data:/var/lib/mysql:Z
+        - ${DATA_DIR:-./data}/mysql_data:/var/lib/mysql:Z
       cap_add:
         - SYS_NICE # CAP_SYS_NICE Prevent runaway mysql log
 
@@ -84,11 +84,11 @@ services:
       - ${DATA_DIR:-./data}/web/app/Config:/var/www/MISP/app/Config:z
       # - ${DATA_DIR:-./data}/web/app/webroot/css:/var/www/MISP/app/webroot/css:z
       - ${DATA_DIR:-./data}/log:/var/www/MISP/app/tmp/logs:z
-      - ${DATA_DIR:-./data}/home_misp/pymisp_venv/scripts:/var/www/MISP/misp-custom/scripts:z
+      - ${DATA_DIR:-./data}/misp-custom/scripts:/var/www/MISP/misp-custom/scripts:z
       - ${DATA_DIR:-./data}/backups:/opt/backups:z
       - ${DATA_DIR:-./data}/cron.d:/etc/cron.d:z
       - ${DATA_DIR:-./data}/ssl_private:/etc/nginx/certs/:z
-      - ${DATA_DIR:-./data}/custom/:/custom/      
+      - ${DATA_DIR:-./data}/custom/:/custom/:z
     environment:
       - "BASE_URL=${BASE_URL}"
       - "CRON_USER_ID=${CRON_USER_ID}"

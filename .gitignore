@@ -13,3 +13,9 @@ docker-compose.override.yml
 .AppleDouble
 .LSOverride
 NOTES.md
+GUIDE.md
+curation.py
+curation-cleanup.py
+backup-misp.sh
+backup-misp-retention.sh
+container.sh
