@@ -400,6 +400,8 @@ EOF
     RUN mkdir /var/log/supervisor
     # Copy all our image specific files to appropriate locations
     COPY files/ /
+    RUN chmod 0755 /etc /etc/logger /etc/misp-docker /etc/nginx /etc/nginx/includes /etc/nginx/sites-available \
+                   /etc/supervisor /etc/supervisor/conf.d /var /var/log /var/log/supervisor /var/www /var/www/html
     # Template PHP version into nginx config
     RUN sed -i "s/@PHP_PACKAGE_VERSION@/${PHP_PACKAGE_VERSION}/g" /etc/nginx/includes/misp
     ENTRYPOINT [ "/entrypoint.sh" ]
