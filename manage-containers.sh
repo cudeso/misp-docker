@@ -6,6 +6,8 @@ LOG_PATH="/data/docker/customer/log/mispsyslog.log"
 DOCKER_COMPOSE_DIR="/data/docker/misp-docker/"
 DOCKER_COMPOSE_FILE="docker-compose.yml"
 LOG_LINES=100
+# "label:compose service" - valkey runs as the "redis" service
+REQUIRED_SERVICES=("misp-core:misp-core" "valkey:redis" "db:db" "misp-modules:misp-modules")
 
 log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
@@ -56,7 +58,7 @@ stop_containers() {
     docker compose -f "$DOCKER_COMPOSE_DIR$DOCKER_COMPOSE_FILE" ps
 }
 
-status_containers() {
+logs_containers() {
     for session in "$MISP_SESSION" "$MISP_LOG_SESSION"; do
         log_message "Grabbing output '$session:0.0'"
         echo " "
@@ -75,6 +77,37 @@ status_containers() {
     docker compose -f "$DOCKER_COMPOSE_DIR$DOCKER_COMPOSE_FILE" logs --tail "$LOG_LINES"
 }
 
+status_containers() {
+    local failed=0
+
+    log_message "Checking required containers..."
+    for entry in "${REQUIRED_SERVICES[@]}"; do
+        label="${entry%%:*}"
+        service="${entry#*:}"
+        container_id=$(docker compose -f "$DOCKER_COMPOSE_DIR$DOCKER_COMPOSE_FILE" ps -q "$service" 2>/dev/null)
+        if [ -z "$container_id" ]; then
+            log_message "[FAIL] $label: no container found."
+            failed=1
+            continue
+        fi
+
+        state=$(docker inspect -f '{{.State.Status}}' "$container_id")
+        health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id")
+        if [ "$state" = "running" ] && [ "$health" != "unhealthy" ]; then
+            log_message "[ OK ] $label: $state${health:+ ($health)}"
+        else
+            log_message "[FAIL] $label: $state${health:+ ($health)}"
+            failed=1
+        fi
+    done
+
+    if [ $failed -ne 0 ]; then
+        log_message "One or more containers are not running."
+        exit 1
+    fi
+    log_message "All containers are running."
+}
+
 shell_container() {
     log_message "Starting /bin/bash in misp-core container..."
     docker compose -f "$DOCKER_COMPOSE_DIR$DOCKER_COMPOSE_FILE" exec misp-core /bin/bash
@@ -90,11 +123,14 @@ case "$1" in
     status)
         status_containers
         ;;
+    logs)
+        logs_containers
+        ;;
     shell)
         shell_container
         ;;
     *)
-        echo "Usage: $0 {start|stop|status|shell}"
+        echo "Usage: $0 {start|stop|status|logs|shell}"
         exit 1
         ;;
 esac
