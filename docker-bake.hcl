@@ -15,11 +15,11 @@ variable "PHP_PACKAGE_VERSION" {
 }
 
 variable "PYPI_SETUPTOOLS_VERSION" {
-  default = "==80.3.1"
+  default = "==84.0.0"
 }
 
 variable "PYPI_SUPERVISOR_VERSION" {
-  default = "==4.2.5"
+  default = "==4.3.0"
 }
 
 variable "PYPI_JSONSCHEMA_VERSION" {
@@ -97,24 +97,8 @@ variable "GUARD_COMMIT" {
 group "default" {
   targets = [
     "misp-modules",
-    "misp-modules-slim",
     "misp-core",
-    "misp-core-slim",
-    "misp-guard",
-  ]
-}
-
-group "slim" {
-  targets = [
-    "misp-modules-slim",
-    "misp-core-slim",
-    "misp-guard",
-  ]
-}
-group "standard" {
-  targets = [
-    "misp-modules",
-    "misp-core",
+    "misp-nginx",
     "misp-guard",
   ]
 }
@@ -126,19 +110,6 @@ target "misp-modules" {
   args = {
     "MODULES_TAG": "${MODULES_TAG}",
     "MODULES_COMMIT": "${MODULES_COMMIT}",
-    "MODULES_FLAVOR": "standard",
-    "DOCKER_HUB_PROXY" : "${DOCKER_HUB_PROXY}",
-  }
-  platforms = "${PLATFORMS}"
-}
-
-target "misp-modules-slim" {
-  inherits = [ "misp-modules" ]
-  tags = flatten(["${NAMESPACE}/misp-modules:latest-slim", "${NAMESPACE}/misp-modules:${COMMIT_HASH}-slim", MODULES_TAG != "" ? ["${NAMESPACE}/misp-modules:${MODULES_TAG}-slim"] : []])
-  args = {
-    "MODULES_TAG": "${MODULES_TAG}",
-    "MODULES_COMMIT": "${MODULES_COMMIT}",
-    "MODULES_FLAVOR": "slim",
     "DOCKER_HUB_PROXY" : "${DOCKER_HUB_PROXY}",
   }
   platforms = "${PLATFORMS}"
@@ -151,7 +122,6 @@ target "misp-core" {
   args = {
     "CORE_TAG": "${CORE_TAG}",
     "CORE_COMMIT": "${CORE_COMMIT}",
-    "CORE_FLAVOR": "standard",
     "PHP_API_VERSION": "${PHP_API_VERSION}",
     "PHP_PACKAGE_VERSION": "${PHP_PACKAGE_VERSION}",
     "PYPI_SETUPTOOLS_VERSION": "${PYPI_SETUPTOOLS_VERSION}",
@@ -171,28 +141,13 @@ target "misp-core" {
   platforms = "${PLATFORMS}"
 }
 
-target "misp-core-slim" {
-  inherits = [ "misp-core" ]
-  tags = flatten(["${NAMESPACE}/misp-core:latest-slim", "${NAMESPACE}/misp-core:${COMMIT_HASH}-slim", CORE_TAG != "" ? ["${NAMESPACE}/misp-core:${CORE_TAG}-slim"] : []])
+target "misp-nginx" {
+  context = "nginx/."
+  dockerfile = "Dockerfile"
+  tags = flatten(["${NAMESPACE}/misp-nginx:latest", "${NAMESPACE}/misp-nginx:${COMMIT_HASH}", CORE_TAG != "" ? ["${NAMESPACE}/misp-nginx:${CORE_TAG}"] : []])
   args = {
     "CORE_TAG": "${CORE_TAG}",
     "CORE_COMMIT": "${CORE_COMMIT}",
-    "CORE_FLAVOR": "slim",
-    "PHP_API_VERSION": "${PHP_API_VERSION}",
-    "PHP_PACKAGE_VERSION": "${PHP_PACKAGE_VERSION}",
-    "PYPI_SETUPTOOLS_VERSION": "${PYPI_SETUPTOOLS_VERSION}",
-    "PYPI_SUPERVISOR_VERSION": "${PYPI_SUPERVISOR_VERSION}",
-    "PYPI_JSONSCHEMA_VERSION": "${PYPI_JSONSCHEMA_VERSION}",
-    "PYPI_LIEF_VERSION": "${PYPI_LIEF_VERSION}",
-    "PYPI_MISP_STIX_VERSION": "${PYPI_MISP_STIX_VERSION}",
-    "PYPI_PLYARA_VERSION": "${PYPI_PLYARA_VERSION}",
-    "PYPI_PYDEEP2_VERSION": "${PYPI_PYDEEP2_VERSION}",
-    "PYPI_PYMISP_VERSION": "${PYPI_PYMISP_VERSION}",
-    "PYPI_PYTHON_MAGIC_VERSION": "${PYPI_PYTHON_MAGIC_VERSION}",
-    "PYPI_PYZMQ_VERSION": "${PYPI_PYZMQ_VERSION}",
-    "PYPI_REDIS_VERSION": "${PYPI_REDIS_VERSION}",
-    "PYPI_TAXII2_CLIENT_VERSION": "${PYPI_TAXII2_CLIENT_VERSION}",
-    "DOCKER_HUB_PROXY" : "${DOCKER_HUB_PROXY}",
   }
   platforms = "${PLATFORMS}"
 }

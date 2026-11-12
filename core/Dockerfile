@@ -1,15 +1,17 @@
 ARG DOCKER_HUB_PROXY=""
 
-
+# --- php-base
 FROM "${DOCKER_HUB_PROXY}python:3.14-slim-trixie" AS php-base
-ENV DEBIAN_FRONTEND=noninteractive
+
 ARG CORE_TAG
 ARG CORE_COMMIT
 ARG PHP_API_VERSION
 RUN : "${PHP_API_VERSION:?Build argument PHP_API_VERSION is required and cannot be empty.}"
 ARG PHP_PACKAGE_VERSION
 RUN : "${PHP_PACKAGE_VERSION:?Build argument PHP_PACKAGE_VERSION is required and cannot be empty.}"
-ARG CORE_FLAVOR
+
+# environment
+ENV DEBIAN_FRONTEND=noninteractive
 
     # Uncomment when building in corporate environments
     # COPY ./cert.pem /usr/local/share/ca-certificates/rootca.pem
@@ -17,36 +19,6 @@ ARG CORE_FLAVOR
 
 RUN bash <<-'EOF' 
         apt-get update
-        if [ "${CORE_FLAVOR}" = "slim" ]; then
-            apt-get install -y --no-install-recommends \
-                lsb-release \
-                ca-certificates \
-                tini \
-                gettext \
-                procps \
-                sudo \
-                nginx \
-                openssl \
-                gpg \
-                gpg-agent \
-                mariadb-client \
-                rsync \
-                rsyslog \
-                php${PHP_PACKAGE_VERSION} \
-                php${PHP_PACKAGE_VERSION}-curl \
-                php${PHP_PACKAGE_VERSION}-xml \
-                php${PHP_PACKAGE_VERSION}-mbstring \
-                php${PHP_PACKAGE_VERSION}-mysql \
-                php${PHP_PACKAGE_VERSION}-redis \
-                php${PHP_PACKAGE_VERSION}-gd \
-                php${PHP_PACKAGE_VERSION}-fpm \
-                php${PHP_PACKAGE_VERSION}-zip \
-                unzip \
-                zip \
-                curl \
-                uuid-runtime \
-                jq
-        else
             apt-get install -y --no-install-recommends \
                 lsb-release \
                 ca-certificates \
@@ -88,42 +60,43 @@ RUN bash <<-'EOF'
                 curl \
                 uuid-runtime \
                 jq
-        fi
 EOF
 
+# --- composer-build
 FROM php-base AS composer-build
+
+# environment
+WORKDIR /tmp
 ENV COMPOSER_ALLOW_SUPERUSER=1
+ENV DEBIAN_FRONTEND=noninteractive
+ENV COMPOSER_ALLOW_SUPERUSER=1
+ARG CORE_TAG
+ARG CORE_COMMIT
+    
+# prepare composer.json
+RUN curl -o /tmp/composer.json https://raw.githubusercontent.com/MISP/MISP/${CORE_COMMIT:-${CORE_TAG}}/app/composer.json
+RUN sed -i '/cake-resque/d' /tmp/composer.json
+RUN sed -i 's/authentication",/authentication"/' /tmp/composer.json
 
-    ENV DEBIAN_FRONTEND=noninteractive
-    ENV COMPOSER_ALLOW_SUPERUSER=1
-    ARG CORE_TAG
-    ARG CORE_COMMIT
-    ARG CORE_FLAVOR
+# inject composer binary
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-    WORKDIR /tmp
-    RUN curl -o /tmp/composer.json https://raw.githubusercontent.com/MISP/MISP/${CORE_COMMIT:-${CORE_TAG}}/app/composer.json
-    RUN sed -i '/cake-resque/d' /tmp/composer.json
-    RUN sed -i 's/authentication",/authentication"/' /tmp/composer.json
-
-    COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-    RUN composer config --no-interaction allow-plugins.composer/installers true
-    RUN composer install
-    RUN bash <<-'EOF' 
-        if [ "${CORE_FLAVOR}" = "slim" ]; then
-            :
-        else
+# install dependencies
+RUN composer config --no-interaction allow-plugins.composer/installers true
+RUN composer install
+RUN bash <<-'EOF' 
             composer require --with-all-dependencies --no-interaction \
                 elasticsearch/elasticsearch:^8.7.0 \
                 jakub-onderka/openid-connect-php:^1.0.0 \
                 certmichelin/openid-connect-php:1.3.0 \
+                phpseclib/phpseclib:^3.0.47 \
                 aws/aws-sdk-php
-        fi
 EOF
 
-
+# --- php-build
 FROM php-base AS php-build
-    ENV TZ=Etc/UTC
-
+# environment
+ENV TZ=Etc/UTC
 ARG CORE_TAG
 ARG CORE_COMMIT
 ARG PHP_API_VERSION
@@ -133,15 +106,6 @@ RUN : "${PHP_PACKAGE_VERSION:?Build argument PHP_PACKAGE_VERSION is required and
 ARG CORE_FLAVOR
 
     RUN bash <<-'EOF' 
-        if [ "${CORE_FLAVOR}" = "slim" ]; then
-            apt-get install -y --no-install-recommends \
-                gcc \
-                g++ \
-                git \
-                make \
-                php${PHP_PACKAGE_VERSION}-dev \
-                php-pear
-        else
             apt-get install -y --no-install-recommends \
                 gcc \
                 g++ \
@@ -154,38 +118,34 @@ ARG CORE_FLAVOR
                 librdkafka-dev \
                 libsimdjson-dev \
                 libzstd-dev
-        fi
         apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 EOF
 
+# configure alternatives for php
 RUN update-alternatives --set php /usr/bin/php${PHP_PACKAGE_VERSION}
 RUN update-alternatives --set php-config /usr/bin/php-config${PHP_PACKAGE_VERSION}
 RUN update-alternatives --set phpize /usr/bin/phpize${PHP_PACKAGE_VERSION}
 
-    RUN bash <<-'EOF' 
-        pecl channel-update pecl.php.net
-        if [ "${CORE_FLAVOR}" = "slim" ]; then
-            tar -czf /pecl_libs.tar.gz -T /dev/null
-        else
-            cp "/usr/lib/$(gcc -dumpmachine)"/libfuzzy.* /usr/lib
-            pecl install rdkafka
-            pecl install simdjson
-            pecl install zstd
-            pecl install brotli
-            git clone --recursive --depth=1 https://github.com/JakubOnderka/pecl-text-ssdeep.git /tmp/pecl-text-ssdeep
-            cd /tmp/pecl-text-ssdeep && phpize && ./configure && make && make install
-            tar -czf /pecl_libs.tar.gz \
-                /usr/lib/php/${PHP_API_VERSION}/ssdeep.so \
-                /usr/lib/php/${PHP_API_VERSION}/rdkafka.so \
-                /usr/lib/php/${PHP_API_VERSION}/brotli.so \
-                /usr/lib/php/${PHP_API_VERSION}/simdjson.so \
-                /usr/lib/php/${PHP_API_VERSION}/zstd.so
-        fi
+RUN --mount=type=bind,from=ghcr.io/php/pie:bin,source=/pie,target=/usr/local/bin/pie <<-'EOF' 
+    cp "/usr/lib/$(gcc -dumpmachine)"/libfuzzy.* /usr/lib
+    pie install --no-cache \
+        rdkafka/rdkafka \
+        kjdev/zstd \
+        kjdev/brotli \
+        awesome/simdjson_plus
+    git clone --recursive --depth=1 https://github.com/JakubOnderka/pecl-text-ssdeep.git /tmp/pecl-text-ssdeep
+    cd /tmp/pecl-text-ssdeep && php
+    ize && ./configure && make && make install
+    tar -czf /pecl_libs.tar.gz \
+        /usr/lib/php/${PHP_API_VERSION}/ssdeep.so \
+        /usr/lib/php/${PHP_API_VERSION}/rdkafka.so \
+        /usr/lib/php/${PHP_API_VERSION}/brotli.so \
+        /usr/lib/php/${PHP_API_VERSION}/simdjson_plus.so \
+        /usr/lib/php/${PHP_API_VERSION}/zstd.so
 EOF
 
-
+# --- python-build
 FROM php-base AS python-build
-
     ARG CORE_TAG
     ARG CORE_COMMIT
 
@@ -256,29 +216,39 @@ RUN bash <<-'EOF'
 
         # Remove files we do not care for
         find /var/www/MISP/INSTALL/* ! -name 'MYSQL.sql' -type f -exec rm {} +
+        find /var/www/MISP/INSTALL/* ! -name 'MYSQL.sql' -type d -exec rm -r {} +
         find /var/www/MISP/INSTALL/* ! -name 'MYSQL.sql' -type l -exec rm {} +
         # Remove most files in .git - we do not use git functionality in docker
         find /var/www/MISP/.git/* ! -name HEAD -exec rm -rf {} +
         # Remove libraries submodules
-        rm -r /var/www/MISP/PyMISP
-        rm -r /var/www/MISP/app/files/scripts/cti-python-stix2
-        rm -r /var/www/MISP/app/files/scripts/misp-stix
-        rm -r /var/www/MISP/app/files/scripts/mixbox
-        rm -r /var/www/MISP/app/files/scripts/python-cybox
-        rm -r /var/www/MISP/app/files/scripts/python-maec
-        rm -r /var/www/MISP/app/files/scripts/python-stix
+        rm -rf /var/www/MISP/PyMISP
+        rm -rf /var/www/MISP/app/files/scripts/cti-python-stix2
+        rm -rf /var/www/MISP/app/files/scripts/misp-stix
+        rm -rf /var/www/MISP/app/files/scripts/mixbox
+        rm -rf /var/www/MISP/app/files/scripts/python-cybox
+        rm -rf /var/www/MISP/app/files/scripts/python-maec
+        rm -rf /var/www/MISP/app/files/scripts/python-stix
+        # Remove unneded directories
+        rm -rf /var/www/MISP/.forgejo
+        rm -rf /var/www/MISP/.github
+        rm -rf /var/www/MISP/build
+        rm -rf /var/www/MISP/format
+        rm -rf /var/www/MISP/debian
+        rm -rf /var/www/MISP/docs
+        rm -rf /var/www/MISP/tools
+        find /var/www/MISP/tests/* ! -name 'modify_config.php' -type f -exec rm {} +
+        find /var/www/MISP/tests/* ! -name 'modify_config.php' -type d -exec rm -r {} +
+        find /var/www/MISP/tests/* ! -name 'modify_config.php' -type l -exec rm {} +
 EOF
 
-
+# --- final stage
 FROM php-base
-
+ARG CORE_TAG
+ARG CORE_COMMIT
+ARG PHP_PACKAGE_VERSION
 ENV PATH="/var/www/MISP/app/Console:${PATH}"
     ENV DEBIAN_FRONTEND=noninteractive
-    ARG CORE_TAG
-    ARG CORE_COMMIT
-    ARG PHP_PACKAGE_VERSION
     RUN : "${PHP_PACKAGE_VERSION:?Build argument PHP_PACKAGE_VERSION is required and cannot be empty.}"
-    ARG CORE_FLAVOR
 
     RUN bash <<-'EOF' 
         set -euo pipefail
@@ -330,9 +300,20 @@ RUN update-alternatives --set php /usr/bin/php${PHP_PACKAGE_VERSION}
 RUN ln -sf /usr/sbin/php-fpm${PHP_PACKAGE_VERSION} /usr/local/sbin/php-fpm
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-    # Install python modules
-    COPY --from=python-build /wheels /wheels
-    RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
+# Install python modules.
+#
+# The wheels are bind-mounted rather than COPYed. A COPY commits them to their own
+# layer, and the `rm -rf /wheels` that used to follow could only write a whiteout on
+# top of that layer -- it cannot remove the layer from the image, so the wheels
+# shipped in everything we publish. A bind mount is never committed to a layer.
+RUN --mount=type=bind,from=python-build,source=/wheels,target=/wheels \
+    pip install --no-cache-dir /wheels/*.whl
+
+# Installation is complete. Keep pip and its vendored dependencies out of the
+# runtime, including the bundled wheel that could reinstall them via ensurepip.
+RUN python -m pip uninstall --yes pip && \
+    python -c 'import pathlib, shutil, sysconfig; shutil.rmtree(pathlib.Path(sysconfig.get_path("stdlib")) / "ensurepip")'
+
     # PHP: install prebuilt libraries, then install the app's PHP deps
     COPY --from=php-build /pecl_libs.tar.gz /
     RUN tar -xzf /pecl_libs.tar.gz && rm /pecl_libs.tar.gz
@@ -341,15 +322,12 @@ RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
     COPY --from=python-build --chown=www-data:www-data --chmod=0550 /var/www/MISP /var/www/MISP
     COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/composer.lock /var/www/MISP/app/composer.lock
     COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/Vendor /var/www/MISP/app/Vendor
-    COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/Plugin /var/www/MISP/app/Plugin
+# From 2.5.51 there is no /tmp/Plugin
+# COPY --from=composer-build --chown=www-data:www-data --chmod=0550 /tmp/Plugin /var/www/MISP/app/Plugin
 
     # Gather these in one layer, only act on actual directories under /etc/php/
     RUN bash <<-'EOF' 
-        if [ "${CORE_FLAVOR}" = "slim" ]; then
-            set -- 
-        else
-            set -- "ssdeep" "rdkafka" "brotli" "simdjson" "zstd"
-        fi
+        set -- "ssdeep" "rdkafka" "brotli" "simdjson_plus" "zstd"
         for mod in "$@"; do
             for dir in /etc/php/*/; do
                 echo "extension=${mod}.so" > "${dir}mods-available/${mod}.ini"
@@ -404,8 +382,8 @@ EOF
                    /etc/supervisor /etc/supervisor/conf.d /var /var/log /var/log/supervisor /var/www /var/www/html
     # Template PHP version into nginx config
     RUN sed -i "s/@PHP_PACKAGE_VERSION@/${PHP_PACKAGE_VERSION}/g" /etc/nginx/includes/misp
+# define entrypoint
     ENTRYPOINT [ "/entrypoint.sh" ]
 
     # Change Workdirectory
     WORKDIR /var/www/MISP
-

@@ -1,6 +1,6 @@
 ARG DOCKER_HUB_PROXY=""
 
-FROM "${DOCKER_HUB_PROXY}python:3.12-slim-trixie" AS python-build
+FROM "${DOCKER_HUB_PROXY}python:3.14-slim-trixie" AS python-build
     ENV DEBIAN_FRONTEND=noninteractive
     ARG GUARD_TAG
     ARG GUARD_COMMIT
@@ -28,7 +28,7 @@ EOF
 
 
 
-FROM "${DOCKER_HUB_PROXY}python:3.12-slim-trixie"
+FROM "${DOCKER_HUB_PROXY}python:3.14-slim-trixie"
     ENV DEBIAN_FRONTEND=noninteractive
 
     RUN <<-EOF
@@ -38,8 +38,13 @@ FROM "${DOCKER_HUB_PROXY}python:3.12-slim-trixie"
         apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 EOF
 
-    COPY --from=python-build /wheels /wheels
-    RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
+    RUN --mount=type=bind,from=python-build,source=/wheels,target=/wheels \
+        pip install --no-cache-dir /wheels/*.whl
+
+    # Installation is complete. Keep pip and its vendored dependencies out of the
+    # runtime, including the bundled wheel that could reinstall them via ensurepip.
+    RUN python -m pip uninstall --yes pip && \
+        python -c 'import pathlib, shutil, sysconfig; shutil.rmtree(pathlib.Path(sysconfig.get_path("stdlib")) / "ensurepip")'
 
     COPY --from=python-build /srv /srv
     COPY files/ /
