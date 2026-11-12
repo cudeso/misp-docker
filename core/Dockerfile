@@ -134,8 +134,7 @@ RUN --mount=type=bind,from=ghcr.io/php/pie:bin,source=/pie,target=/usr/local/bin
         kjdev/brotli \
         awesome/simdjson_plus
     git clone --recursive --depth=1 https://github.com/JakubOnderka/pecl-text-ssdeep.git /tmp/pecl-text-ssdeep
-    cd /tmp/pecl-text-ssdeep && php
-    ize && ./configure && make && make install
+    cd /tmp/pecl-text-ssdeep && phpize && ./configure && make && make install
     tar -czf /pecl_libs.tar.gz \
         /usr/lib/php/${PHP_API_VERSION}/ssdeep.so \
         /usr/lib/php/${PHP_API_VERSION}/rdkafka.so \
