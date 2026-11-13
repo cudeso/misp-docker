@@ -34,6 +34,7 @@ else
 fi
 export BASE_URL=${BASE_URL}
 export DISABLE_IPV6=${DISABLE_IPV6:-false}
+export DISABLE_SSL_REDIRECT=${DISABLE_SSL_REDIRECT:-false}
 export DISABLE_CA_REFRESH=${DISABLE_CA_REFRESH:-false}
 export SMTP_FQDN=${SMTP_FQDN:-mail}
 export SMTP_PORT=${SMTP_PORT:-25}
@@ -69,7 +70,16 @@ export PROXY_ENABLE=${PROXY_ENABLE:-false}
 export DEBUG=${DEBUG:-0}
 export ENABLE_THEMES=${ENABLE_THEMES:-false}
 
-export PHP_LISTEN_FPM=true
+# nginx runs inside this container (supervisor) and talks to php-fpm over the unix socket.
+# Only set PHP_LISTEN_FPM (non-empty) when using a separate nginx container that connects on tcp/9002.
+export PHP_LISTEN_FPM=${PHP_LISTEN_FPM:-}
+
+export FASTCGI_READ_TIMEOUT=${FASTCGI_READ_TIMEOUT:-300s}
+export FASTCGI_SEND_TIMEOUT=${FASTCGI_SEND_TIMEOUT:-300s}
+export FASTCGI_CONNECT_TIMEOUT=${FASTCGI_CONNECT_TIMEOUT:-300s}
+# Upstream 2.5.51 renamed this to FASTCGI_LISTEN_STATUS; accept both, the scripts use FASTCGI_STATUS_LISTEN.
+export FASTCGI_STATUS_LISTEN=${FASTCGI_STATUS_LISTEN:-${FASTCGI_LISTEN_STATUS:-}}
+
 export PHP_FCGI_CHILDREN=${PHP_FCGI_CHILDREN:-5}
 export PHP_FCGI_START_SERVERS=${PHP_FCGI_START_SERVERS:-2}
 export PHP_FCGI_SPARE_SERVERS=${PHP_FCGI_SPARE_SERVERS:-1}
@@ -92,32 +102,16 @@ export PHP_SESSION_COOKIE_SAMESITE=${PHP_SESSION_COOKIE_SAMESITE:-Lax}
 
 export TZ=${TZ:-UTC}
 
+export NGINX_X_FORWARDED_FOR=${NGINX_X_FORWARDED_FOR:-false}
+export NGINX_SET_REAL_IP_FROM=${NGINX_SET_REAL_IP_FROM}
+export NGINX_CLIENT_MAX_BODY_SIZE=${NGINX_CLIENT_MAX_BODY_SIZE:-50M}
+
 export STUNNEL=${STUNNEL:-false}
 export STUNNEL_CONFIG=${STUNNEL_CONFIG}
 
 export SUPERVISOR_HOST=${SUPERVISOR_HOST:-127.0.0.1}
 export SUPERVISOR_USERNAME=${SUPERVISOR_USERNAME:-supervisor}
 export SUPERVISOR_PASSWORD=${SUPERVISOR_PASSWORD:-supervisor}
-
-# error out on legacy variables
-check_deprecated_env() {
-    local fail=0
-    local msg="This variable was renamed or removed in a breaking change. See the migration notes in the README: https://github.com/misp/misp-docker"
-    local deprecated_vars=(CORE_HTTP_PORT CORE_HTTPS_PORT HSTS_MAX_AGE X_FRAME_OPTIONS CONTENT_SECURITY_POLICY)
-
-    for var in "${deprecated_vars[@]}"; do
-        if [ -n "${!var:-}" ]; then
-            echo "ERROR: ${var} is deprecated. ${msg}" >&2
-            fail=1
-        fi
-    done
-
-    if [ "$fail" -eq 1 ]; then
-        exit 1
-    fi
-}
-
-check_deprecated_env
 
 # Setting Timezone for supervisord
 update-alternatives --install /etc/localtime localtime /usr/share/zoneinfo/${TZ} 0

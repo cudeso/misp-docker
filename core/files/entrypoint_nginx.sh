@@ -449,7 +449,7 @@ init_nginx() {
 
     if [[ "$FASTCGI_STATUS_LISTEN" != "" ]]; then
         echo "... enabling php-fpm status page"
-        ln -s /etc/nginx/sites-available/php-fpm-status /etc/nginx/sites-enabled/php-fpm-status
+        ln -sf /etc/nginx/sites-available/php-fpm-status /etc/nginx/sites-enabled/php-fpm-status
         sed -i -E "s/ listen [^;]+/ listen $FASTCGI_STATUS_LISTEN/" /etc/nginx/sites-enabled/php-fpm-status
     elif [[ -f /etc/nginx/sites-enabled/php-fpm-status ]]; then
         echo "... disabling php-fpm status page"
@@ -472,9 +472,8 @@ echo "INIT | Initialize NGINX ..." && init_nginx
 nginx -g 'daemon off;' & master_pid=$!
 
 # Initialize MISP
-echo "INIT | Initialize MISP files and configurations ..." && init_misp_data_files
-echo "INIT | Update MISP app/files directory ..." && update_misp_data_files
-echo "INIT | Enforce MISP permissions ..." && enforce_misp_data_permissions
+# init_misp_data_files, update_misp_data_files and enforce_misp_data_permissions (upstream 2.5.51 versions)
+/init_misp.sh
 echo "INIT | Flip NGINX live ..." && flip_nginx true true
 
 # Run configure MISP script
