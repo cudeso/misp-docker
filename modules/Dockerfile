@@ -39,6 +39,8 @@ RUN <<-EOF
         poetry export -E all --without-hashes -f requirements.txt -o requirements.txt
 EOF
 RUN pip wheel -r requirements.txt --no-cache-dir -w /wheels/
+# Extra Python packages for the runtime image (pyzmq provides "import zmq")
+RUN pip wheel pyzmq --no-cache-dir -w /wheels/
 RUN poetry build --output /wheels/
 
 WORKDIR /srv/
