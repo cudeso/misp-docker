@@ -127,10 +127,12 @@ RUN update-alternatives --set php-config /usr/bin/php-config${PHP_PACKAGE_VERSIO
 RUN update-alternatives --set phpize /usr/bin/phpize${PHP_PACKAGE_VERSION}
 
 RUN --mount=type=bind,from=ghcr.io/php/pie:bin,source=/pie,target=/usr/local/bin/pie <<-'EOF' 
+    set -eux
     cp "/usr/lib/$(gcc -dumpmachine)"/libfuzzy.* /usr/lib
+    # kjdev/zstd pinned: 0.19.0 release archive misses zstd/lib/common/bmi2.h and fails to build
     pie install --no-cache \
         rdkafka/rdkafka \
-        kjdev/zstd \
+        kjdev/zstd:0.18.0 \
         kjdev/brotli \
         awesome/simdjson_plus
     git clone --recursive --depth=1 https://github.com/JakubOnderka/pecl-text-ssdeep.git /tmp/pecl-text-ssdeep
